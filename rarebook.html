@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#13100a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="RareBook">
+<title>RareBook</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#13100a;--surface:#1c1812;--surface2:#252018;
+  --border:#332d1f;--border2:#3e3728;
+  --gold:#c9a84c;--gold-dim:#7a6430;--gold-glow:rgba(201,168,76,.12);
+  --text:#ede3cf;--text-dim:#9a8b70;--text-muted:#5a5040;
+  --red:#d96060;--green:#5aaa80;--blue:#6090d0;
+  --nav-h:64px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%;background:var(--bg)}
+body{min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.app{max-width:540px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:var(--nav-h)}
+
+/* ── Header ── */
+header{padding:16px 18px 0;display:flex;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:9px;flex:1}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#c9a84c,#a07828);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-text{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px}
+.logo-text em{color:var(--gold);font-style:normal}
+.header-title{flex:1;font-size:15px;font-weight:700;color:var(--text);text-align:center}
+.back-btn{background:none;border:none;color:var(--gold);font-size:14px;font-weight:600;cursor:pointer;padding:4px 0;white-space:nowrap;display:none}
+
+/* ── Views ── */
+.view{flex:1;display:flex;flex-direction:column}
+.view.hidden{display:none}
+main{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:540px;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border2);display:flex;align-items:stretch;z-index:90;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text-muted);transition:color .18s;position:relative}
+.nav-btn.active{color:var(--gold)}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.3px}
+.nav-badge{position:absolute;top:8px;right:calc(50% - 16px);background:var(--gold);color:#13100a;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+
+/* ── Mode Selector ── */
+.mode-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mode-btn{background:var(--surface);border:2px solid var(--border);border-radius:13px;padding:12px 8px;cursor:pointer;text-align:center;transition:border-color .18s,background .18s;display:flex;flex-direction:column;align-items:center;gap:3px}
+.mode-btn:hover{border-color:var(--border2);background:var(--surface2)}
+.mode-btn.active{border-color:var(--gold);background:var(--gold-glow)}
+.mode-icon{font-size:21px;line-height:1}
+.mode-name{font-size:12px;font-weight:700;color:var(--text)}
+.mode-desc{font-size:10px;color:var(--text-muted);line-height:1.3}
+
+/* ── Upload Zone ── */
+.upload-zone{border:2px dashed var(--border2);border-radius:18px;transition:border-color .18s,background .18s;position:relative;overflow:hidden}
+.upload-zone.drag-over,.upload-zone:not(.has-images):hover{border-color:var(--gold);background:var(--gold-glow)}
+.upload-zone.has-images{border-style:solid;border-color:var(--border2)}
+.upload-empty{padding:28px 20px;text-align:center;cursor:pointer}
+.upload-icon{font-size:44px;margin-bottom:8px;line-height:1}
+.upload-title{font-size:17px;font-weight:700;margin-bottom:4px}
+.upload-hint{font-size:13px;color:var(--text-dim);margin-bottom:20px}
+.upload-actions{display:flex;gap:10px;justify-content:center}
+.btn-upload{background:var(--surface2);border:1px solid var(--border2);border-radius:11px;padding:10px 16px;color:var(--text);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:border-color .18s,background .18s;white-space:nowrap}
+.btn-upload:hover{border-color:var(--gold);background:var(--gold-glow)}
+.btn-upload.primary{background:var(--gold);border-color:var(--gold);color:#13100a;font-weight:700}
+.btn-upload.primary:hover{opacity:.88}
+#file-input,#camera-input{display:none}
+.image-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
+.thumb{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--bg)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-remove{position:absolute;top:4px;right:4px;width:22px;height:22px;background:rgba(0,0,0,.75);border:none;border-radius:50%;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);font-size:9px;color:rgba(255,255,255,.7);text-align:center;padding:3px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.thumb-add{aspect-ratio:1;border:2px dashed var(--border2);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-size:11px;gap:4px;transition:border-color .18s,color .18s;background:none}
+.thumb-add:hover{border-color:var(--gold);color:var(--gold)}
+.thumb-add-icon{font-size:20px}
+.grid-footer{display:flex;align-items:center;justify-content:space-between;padding:4px 12px 10px;font-size:12px;color:var(--text-muted)}
+
+/* ── Buttons ── */
+.btn-analyze{width:100%;background:linear-gradient(135deg,#c9a84c,#a07828);border:none;border-radius:14px;padding:15px;color:#13100a;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .18s,transform .1s;box-shadow:0 4px 20px rgba(201,168,76,.2)}
+.btn-analyze:hover:not(:disabled){opacity:.9}
+.btn-analyze:active:not(:disabled){transform:scale(.99)}
+.btn-analyze:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.btn-gold{background:var(--gold);border:none;border-radius:9px;padding:10px 18px;color:#13100a;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .18s}
+.btn-gold:hover{opacity:.85}
+.btn-ghost{background:none;border:1px solid var(--border2);border-radius:8px;padding:5px 12px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:border-color .18s,color .18s;white-space:nowrap}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ── Loading ── */
+.loading{display:none;text-align:center;padding:36px 0}
+.loading.active{display:block}
+.spinner-wrap{position:relative;width:52px;height:52px;margin:0 auto 16px}
+.spinner{width:52px;height:52px;border:3px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin .85s linear infinite}
+.spinner-inner{position:absolute;inset:8px;border:2px solid transparent;border-bottom-color:var(--gold-dim);border-radius:50%;animation:spin 1.4s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-title{font-size:15px;font-weight:500;margin-bottom:5px}
+.loading-stage{font-size:13px;color:var(--text-muted)}
+
+/* ── Error ── */
+.error-box{display:none;background:rgba(217,96,96,.08);border:1px solid rgba(217,96,96,.28);border-radius:13px;padding:15px 16px}
+.error-box.active{display:block}
+.error-title{font-weight:700;color:var(--red);font-size:14px;margin-bottom:4px}
+.error-body{color:#c07070;font-size:14px;line-height:1.5}
+
+/* ── Results ── */
+.results{display:none}.results.active{display:block}
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.results-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+.history-banner{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:11px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim);margin-bottom:14px}
+.history-banner strong{color:var(--gold)}
+
+/* ── Result Action Buttons ── */
+.result-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.btn-action{background:var(--surface);border:1px solid var(--border2);border-radius:11px;padding:11px 8px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .18s,background .18s;position:relative}
+.btn-action:hover:not(.disabled){border-color:var(--gold);background:var(--gold-glow)}
+.btn-action.disabled{opacity:.45;cursor:default}
+.btn-action-icon{font-size:18px;line-height:1}
+.btn-action-label{font-size:11px;line-height:1.2;text-align:center}
+.btn-pro-tag{font-size:9px;font-weight:800;color:#13100a;background:var(--gold);padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.3px}
+.btn-action.success{border-color:rgba(90,170,128,.4);color:var(--green)}
+.tooltip-popup{position:absolute;bottom:calc(100%+8px);left:50%;transform:translateX(-50%);background:#fff;color:#222;font-size:12px;font-weight:500;white-space:nowrap;padding:6px 10px;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:10;pointer-events:none;animation:fadeUp .2s ease}
+.tooltip-popup::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#fff}
+
+/* ── Card / Sections ── */
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:18px;overflow:hidden;margin-bottom:12px}
+.card-hero{padding:18px 20px;background:linear-gradient(160deg,var(--surface2) 0%,var(--bg) 100%);border-bottom:1px solid var(--border)}
+.card-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.book-title{font-size:19px;font-weight:800;color:var(--text);line-height:1.25;letter-spacing:-.3px}
+.book-author{margin-top:3px;font-size:14px;color:var(--gold);font-weight:500}
+.conf-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:capitalize;white-space:nowrap;align-self:flex-start}
+.conf-high{color:var(--green);background:rgba(90,170,128,.12);border:1px solid rgba(90,170,128,.3)}
+.conf-medium{color:var(--gold);background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3)}
+.conf-low{color:var(--red);background:rgba(217,96,96,.12);border:1px solid rgba(217,96,96,.3)}
+.meta-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.chip{font-size:12px;color:var(--text-dim);background:var(--bg);border:1px solid var(--border);padding:3px 10px;border-radius:8px}
+.item-type-chip{font-size:10px;font-weight:700;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-bottom:5px}
+.rarity-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:700}
+.r-unique,.r-extremely-rare{background:rgba(240,80,80,.14);color:#f07070;border:1px solid rgba(240,80,80,.3)}
+.r-very-rare{background:rgba(240,150,70,.14);color:#f09850;border:1px solid rgba(240,150,70,.3)}
+.r-rare{background:rgba(201,168,76,.14);color:var(--gold);border:1px solid rgba(201,168,76,.3)}
+.r-scarce{background:rgba(90,180,120,.14);color:#6dc890;border:1px solid rgba(90,180,120,.3)}
+.r-uncommon{background:rgba(100,150,230,.14);color:#80a8e8;border:1px solid rgba(100,150,230,.3)}
+.r-common{background:rgba(130,130,130,.12);color:#909090;border:1px solid rgba(130,130,130,.28)}
+.sec{padding:14px 18px;border-bottom:1px solid var(--border)}
+.sec:last-child{border-bottom:none}
+.sec-label{font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.sec-text{font-size:14px;color:var(--text);line-height:1.65}
+.sec-sub{margin-top:7px;font-size:13px;color:var(--text-dim);line-height:1.6}
+.bib-list{list-style:none;display:flex;flex-direction:column;gap:5px}
+.bib-list li{font-size:14px;color:var(--text);padding-left:16px;position:relative}
+.bib-list li::before{content:'›';position:absolute;left:4px;color:var(--gold);font-weight:700}
+.val-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.val-card{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 8px;text-align:center}
+.val-market{font-size:9px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.val-range{font-size:12px;font-weight:700;color:var(--gold);line-height:1.3}
+.val-note{margin-top:4px;font-size:10px;color:var(--text-muted);line-height:1.4}
+.buy-card{border-radius:13px;padding:14px;display:flex;gap:12px;align-items:flex-start}
+.buy-yes{background:rgba(90,170,128,.1);border:1px solid rgba(90,170,128,.28)}
+.buy-maybe{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.28)}
+.buy-no{background:rgba(217,96,96,.1);border:1px solid rgba(217,96,96,.28)}
+.buy-icon{font-size:26px;line-height:1;flex-shrink:0}
+.buy-verdict{font-size:14px;font-weight:800;margin-bottom:3px}
+.buy-yes .buy-verdict{color:var(--green)}.buy-maybe .buy-verdict{color:var(--gold)}.buy-no .buy-verdict{color:var(--red)}
+.buy-rationale{font-size:13px;color:var(--text-dim);line-height:1.55}
+.market-links{display:flex;flex-direction:column;gap:8px}
+.market-link{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:11px;text-decoration:none;color:var(--text);transition:border-color .18s}
+.market-link:hover{border-color:var(--gold)}
+.market-link-icon{font-size:19px;flex-shrink:0}
+.market-link-body{flex:1;min-width:0}
+.market-link-name{font-size:13px;font-weight:600;color:var(--text)}
+.market-link-desc{font-size:11px;color:var(--text-muted)}
+.market-link-arrow{color:var(--text-muted);font-size:14px}
+.catalog-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.catalog-label{font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px}
+.btn-copy-inline{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:5px 11px;color:var(--text-dim);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;transition:border-color .18s,color .18s}
+.btn-copy-inline:hover{border-color:var(--gold);color:var(--gold)}
+.btn-copy-inline.copied{color:var(--green);border-color:rgba(90,170,128,.4)}
+.catalog-block{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:Georgia,serif;font-size:14px;line-height:1.75;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.price-highlight{display:flex;align-items:baseline;gap:10px;margin-bottom:5px}
+.price-amount{font-size:22px;font-weight:800;color:var(--gold)}
+.price-label{font-size:12px;color:var(--text-dim)}
+.keyword-chips{display:flex;flex-wrap:wrap;gap:6px}
+.kw-chip{font-size:11px;color:var(--text-dim);background:var(--bg);border:1px solid var(--border);padding:3px 9px;border-radius:6px}
+.bib-desc,.citation-block{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:Georgia,serif;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.scholar-list{display:flex;flex-direction:column;gap:9px}
+.scholar-item{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+.scholar-authors{font-size:13px;font-weight:600;color:var(--text)}
+.scholar-title{font-size:13px;color:var(--text-dim);font-style:italic;margin-top:2px}
+.scholar-meta{font-size:11px;color:var(--text-muted);margin-top:2px}
+.inst-list{display:flex;flex-direction:column;gap:6px}
+.inst-item{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text)}
+.inst-item::before{content:'🏛';font-size:13px;flex-shrink:0}
+.warning-box{background:rgba(240,150,70,.08);border:1px solid rgba(240,150,70,.25);border-radius:11px;padding:13px;font-size:13px;color:#d8905a;line-height:1.6}
+.warning-title{font-weight:700;margin-bottom:4px;font-size:13px}
+.tag-warn{font-size:9px;font-weight:800;color:#f09850;background:rgba(240,150,70,.12);border:1px solid rgba(240,150,70,.25);padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.4px}
+
+/* ── Alert Promo ── */
+.alert-promo{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03));border:1px solid rgba(201,168,76,.22);border-radius:14px;padding:16px;display:flex;gap:13px;align-items:flex-start;margin-bottom:12px}
+.alert-icon{font-size:24px;flex-shrink:0}
+.alert-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.premium-badge{font-size:9px;font-weight:800;color:#13100a;background:var(--gold);padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.5px}
+.alert-desc{font-size:13px;color:var(--text-dim);line-height:1.5;margin-bottom:11px}
+.btn-alert{background:var(--gold);border:none;border-radius:9px;padding:8px 16px;color:#13100a;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .18s}
+.btn-alert:hover{opacity:.85}
+
+/* ── Disclaimer ── */
+.disclaimer{font-size:11px;color:var(--text-muted);text-align:center;padding:4px 18px 18px;line-height:1.55}
+
+/* ── History View ── */
+.history-view{flex:1;display:flex;flex-direction:column}
+.history-toolbar{padding:14px 18px 10px;display:flex;gap:9px;align-items:center}
+.search-input{flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:9px 13px;color:var(--text);font-size:14px;outline:none;transition:border-color .18s}
+.search-input:focus{border-color:var(--gold)}
+.search-input::placeholder{color:var(--text-muted)}
+.btn-clear-all{background:none;border:1px solid var(--border);border-radius:9px;padding:8px 13px;color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:border-color .18s,color .18s}
+.btn-clear-all:hover{border-color:var(--red);color:var(--red)}
+.history-list{flex:1;overflow-y:auto;padding:0 18px 18px;display:flex;flex-direction:column;gap:10px}
+.history-empty{text-align:center;padding:60px 20px;color:var(--text-muted)}
+.history-empty .big-icon{font-size:52px;margin-bottom:14px}
+.history-empty p{font-size:14px;line-height:1.6}
+.hist-card{background:var(--surface);border:1px solid var(--border2);border-radius:14px;display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;transition:border-color .18s;position:relative;overflow:hidden}
+.hist-card:hover{border-color:var(--gold)}
+.hist-thumb{width:56px;height:56px;border-radius:9px;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px}
+.hist-thumb img{width:100%;height:100%;object-fit:cover}
+.hist-body{flex:1;min-width:0}
+.hist-title{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-author{font-size:13px;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-meta{display:flex;align-items:center;gap:7px;margin-top:3px}
+.hist-date{font-size:11px;color:var(--text-muted)}
+.hist-mode{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;text-transform:capitalize}
+.hist-mode.collector{color:var(--gold);background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25)}
+.hist-mode.dealer{color:var(--green);background:rgba(90,170,128,.12);border:1px solid rgba(90,170,128,.25)}
+.hist-mode.academic{color:var(--blue);background:rgba(96,144,208,.12);border:1px solid rgba(96,144,208,.25)}
+.hist-notes-preview{font-size:11px;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic}
+.hist-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.hist-del-btn{background:none;border:1px solid var(--border);border-radius:7px;width:28px;height:28px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:border-color .18s,color .18s}
+.hist-del-btn:hover{border-color:var(--red);color:var(--red)}
+.hist-note-btn{background:none;border:1px solid var(--border);border-radius:7px;width:28px;height:28px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:border-color .18s,color .18s}
+.hist-note-btn:hover{border-color:var(--gold);color:var(--gold)}
+.hist-note-btn.has-note{color:var(--gold);border-color:rgba(201,168,76,.4)}
+
+/* ── Notes inline card ── */
+.notes-card{background:var(--surface);border:1px solid var(--border2);border-radius:13px;padding:14px;margin-bottom:12px}
+.notes-card-label{font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.notes-textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;outline:none;resize:vertical;min-height:80px;transition:border-color .18s}
+.notes-textarea:focus{border-color:var(--gold)}
+.notes-textarea::placeholder{color:var(--text-muted)}
+.notes-save-row{display:flex;justify-content:flex-end;margin-top:8px}
+
+/* ── Settings View ── */
+.settings-view{flex:1;padding:18px;display:flex;flex-direction:column;gap:16px}
+.settings-section-title{font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.settings-card{background:var(--surface);border:1px solid var(--border2);border-radius:14px;overflow:hidden}
+.settings-row{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.settings-row:last-child{border-bottom:none}
+.settings-row-icon{font-size:20px;flex-shrink:0}
+.settings-row-body{flex:1;min-width:0}
+.settings-row-label{font-size:14px;font-weight:600;color:var(--text)}
+.settings-row-desc{font-size:12px;color:var(--text-muted);margin-top:1px}
+.settings-api-field{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+.settings-api-input{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--text);font-size:13px;font-family:'SF Mono','Fira Code',monospace;outline:none;transition:border-color .18s;min-width:0}
+.settings-api-input:focus{border-color:var(--gold)}
+.settings-api-input::placeholder{color:var(--text-muted);font-family:inherit}
+.settings-status{font-size:12px;padding:0 16px 12px;min-height:18px}
+.settings-status.ok{color:var(--green)}.settings-status.err{color:var(--red)}
+.settings-danger-btn{background:none;border:1px solid rgba(217,96,96,.3);border-radius:10px;padding:12px 16px;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;width:100%;text-align:left;transition:border-color .18s,background .18s}
+.settings-danger-btn:hover{border-color:var(--red);background:rgba(217,96,96,.06)}
+.settings-about{font-size:12px;color:var(--text-muted);text-align:center;line-height:1.6;padding:8px 0}
+
+/* ── Modals ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;z-index:100;padding:0}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:20px 20px 0 0;padding:22px 20px 32px;width:100%;max-width:540px;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:38px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.modal-subtitle{font-size:13px;color:var(--text-dim);margin-bottom:18px;line-height:1.5}
+.modal-field{margin-bottom:11px}
+.modal-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:block}
+.modal-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--text);font-size:15px;outline:none;transition:border-color .18s}
+.modal-input:focus{border-color:var(--gold)}
+.modal-input::placeholder{color:var(--text-muted)}
+.modal-footer{display:flex;gap:10px;margin-top:18px}
+.btn-modal-cancel{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:13px;color:var(--text-dim);font-size:15px;font-weight:600;cursor:pointer}
+.btn-modal-submit{flex:2;background:var(--gold);border:none;border-radius:10px;padding:13px;color:#13100a;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .18s}
+.btn-modal-submit:hover{opacity:.88}
+.modal-success{text-align:center;padding:12px 0}
+.modal-success-icon{font-size:44px;margin-bottom:12px}
+.modal-success-title{font-size:17px;font-weight:700;margin-bottom:5px}
+.modal-success-text{font-size:14px;color:var(--text-dim)}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:calc(var(--nav-h) + 12px);left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:200;animation:fadeUp .25s ease,fadeOut .3s ease 2s forwards;white-space:nowrap;max-width:300px;text-align:center}
+@keyframes fadeOut{to{opacity:0;transform:translateX(-50%) translateY(4px)}}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px) translateX(-50%)}to{opacity:1;transform:translateY(0) translateX(-50%)}}
+.fade-up{animation:fadeUpEl .4s ease both}
+@keyframes fadeUpEl{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ── -->
+  <header id="app-header">
+    <div class="logo" id="header-logo">
+      <div class="logo-icon">📚</div>
+      <div class="logo-text">Rare<em>Book</em></div>
+    </div>
+    <div class="header-title" id="header-title" style="display:none"></div>
+    <button class="back-btn" id="back-btn">← Back to History</button>
+  </header>
+
+  <!-- ── Home View ── -->
+  <div class="view" id="view-home">
+    <main>
+      <div class="mode-selector" id="mode-selector">
+        <button class="mode-btn active" data-mode="collector"><span class="mode-icon">📖</span><span class="mode-name">Collector</span><span class="mode-desc">Identify, value & buy</span></button>
+        <button class="mode-btn" data-mode="dealer"><span class="mode-icon">🏷</span><span class="mode-name">Dealer</span><span class="mode-desc">Catalog & price</span></button>
+        <button class="mode-btn" data-mode="academic"><span class="mode-icon">🎓</span><span class="mode-name">Academic</span><span class="mode-desc">Research & cite</span></button>
+      </div>
+
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-empty" id="upload-empty">
+          <div class="upload-icon">📖</div>
+          <div class="upload-title">Upload Book Images</div>
+          <div class="upload-hint">Title page, binding, colophon, annotations, bookplates</div>
+          <div class="upload-actions">
+            <label class="btn-upload primary" for="camera-input">📷 Camera</label>
+            <label class="btn-upload" for="file-input">🖼 Upload</label>
+          </div>
+        </div>
+        <div class="image-grid" id="image-grid" style="display:none"></div>
+      </div>
+
+      <input type="file" id="camera-input" accept="image/*" capture="environment">
+      <input type="file" id="file-input" accept="image/*" multiple>
+
+      <button class="btn-analyze" id="analyze-btn" disabled>Analyze</button>
+
+      <div class="loading" id="loading">
+        <div class="spinner-wrap"><div class="spinner"></div><div class="spinner-inner"></div></div>
+        <div class="loading-title" id="loading-title">Analyzing with Claude…</div>
+        <div class="loading-stage" id="loading-stage"></div>
+      </div>
+
+      <div class="error-box" id="error-box">
+        <div class="error-title">Analysis Failed</div>
+        <div class="error-body" id="error-body"></div>
+      </div>
+
+      <div class="results" id="results"></div>
+    </main>
+    <div class="disclaimer">Valuations are market estimates only. For insurance, authentication or sale, always consult a certified rare book appraiser or auction specialist.</div>
+  </div>
+
+  <!-- ── History View ── -->
+  <div class="view hidden" id="view-history">
+    <div class="history-view">
+      <div class="history-toolbar">
+        <input type="search" class="search-input" id="history-search" placeholder="Search by title or author…">
+        <button class="btn-clear-all" id="clear-history-btn">Clear all</button>
+      </div>
+      <div class="history-list" id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Settings View ── -->
+  <div class="view hidden" id="view-settings">
+    <div class="settings-view">
+      <div>
+        <div class="settings-section-title">API Configuration</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-row-icon">🔑</div>
+            <div class="settings-row-body">
+              <div class="settings-row-label">Anthropic API Key</div>
+              <div class="settings-row-desc">Required to analyze images with Claude</div>
+            </div>
+          </div>
+          <div class="settings-api-field">
+            <input type="password" class="settings-api-input" id="settings-api-key" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+            <button class="btn-gold" id="settings-save-key">Save</button>
+          </div>
+          <div class="settings-status" id="settings-api-status"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="settings-section-title">Model</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-row-icon">🤖</div>
+            <div class="settings-row-body">
+              <div class="settings-row-label">Claude Opus 4.6</div>
+              <div class="settings-row-desc">Most capable model — best for rare book analysis</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="settings-section-title">Data</div>
+        <div class="settings-card">
+          <div class="settings-row" id="settings-history-count">
+            <div class="settings-row-icon">📋</div>
+            <div class="settings-row-body">
+              <div class="settings-row-label">Scan History</div>
+              <div class="settings-row-desc" id="settings-history-desc">Loading…</div>
+            </div>
+          </div>
+          <div class="settings-row" style="padding:12px 16px">
+            <button class="settings-danger-btn" id="settings-clear-history">🗑 Clear All Scan History</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-about">
+        RareBook — AI-powered rare book analysis<br>
+        Powered by Claude claude-opus-4-6 · All data stored locally<br>
+        <span style="color:var(--border2)">──────────</span><br>
+        For insurance or sale, always consult a certified appraiser.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bottom Nav ── -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
+    <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label">History</span><span class="nav-badge" id="nav-badge" style="display:none">0</span></button>
+    <button class="nav-btn" data-view="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Settings</span></button>
+  </nav>
+</div>
+
+<!-- ── Alerts Modal ── -->
+<div class="modal-overlay" id="alerts-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="modal-alerts-form">
+      <div class="modal-title">🔔 Book Search Alert <span class="premium-badge">Premium</span></div>
+      <div class="modal-subtitle">Get notified when this item appears at auction or with dealers.</div>
+      <div class="modal-field"><label class="modal-label" for="alert-email">Your email</label><input type="email" class="modal-input" id="alert-email" placeholder="you@example.com"></div>
+      <div class="modal-field"><label class="modal-label" for="alert-item">Item</label><input type="text" class="modal-input" id="alert-item"></div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="alerts-cancel">Cancel</button>
+        <button class="btn-modal-submit" id="alerts-submit">Join Waitlist →</button>
+      </div>
+    </div>
+    <div id="modal-alerts-success" class="modal-success" style="display:none">
+      <div class="modal-success-icon">🎉</div>
+      <div class="modal-success-title">You're on the waitlist!</div>
+      <div class="modal-success-text">We'll let you know when alerts launch and when we spot this item.</div>
+      <button class="btn-gold" style="margin-top:18px;width:100%;padding:13px;font-size:15px;border-radius:10px" id="alerts-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Notes Modal ── -->
+<div class="modal-overlay" id="notes-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📝 Personal Notes</div>
+    <div class="modal-subtitle">Add notes for this scan — e.g. "Bought for €45 at Drouot" or "Passed — condition too poor".</div>
+    <textarea class="modal-input notes-textarea" id="notes-textarea" placeholder="Your notes about this item…" rows="5" style="min-height:120px;resize:vertical"></textarea>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" id="notes-cancel">Cancel</button>
+      <button class="btn-modal-submit" id="notes-save">Save Notes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────
+let images = [];
+let currentMode = 'collector';
+let currentBook = null;
+let currentView = 'home';
+let isViewingHistory = false;
+let viewingHistoryId = null;
+let editingNotesId = null;
+const MAX_IMAGES = 8;
+
+// ── DOM ────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const viewHome      = $('view-home');
+const viewHistory   = $('view-history');
+const viewSettings  = $('view-settings');
+const headerLogo    = $('header-logo');
+const headerTitle   = $('header-title');
+const backBtn       = $('back-btn');
+const modeSelector  = $('mode-selector');
+const uploadZone    = $('upload-zone');
+const uploadEmpty   = $('upload-empty');
+const imageGrid     = $('image-grid');
+const cameraInput   = $('camera-input');
+const fileInput     = $('file-input');
+const analyzeBtn    = $('analyze-btn');
+const loading       = $('loading');
+const loadingTitle  = $('loading-title');
+const loadingStage  = $('loading-stage');
+const errorBox      = $('error-box');
+const errorBody     = $('error-body');
+const resultsEl     = $('results');
+const historySearch = $('history-search');
+const historyList   = $('history-list');
+const navBadge      = $('nav-badge');
+const alertsModal   = $('alerts-modal');
+const notesModal    = $('notes-modal');
+
+// ── View Management ────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', e => switchView(e.currentTarget.dataset.view));
+});
+
+function switchView(view) {
+  if (isViewingHistory && view !== 'home') exitHistoryMode();
+  currentView = view;
+  viewHome.classList.toggle('hidden', view !== 'home');
+  viewHistory.classList.toggle('hidden', view !== 'history');
+  viewSettings.classList.toggle('hidden', view !== 'settings');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+
+  if (view === 'history') renderHistoryList();
+  if (view === 'settings') updateSettingsView();
+  if (view === 'home' && !isViewingHistory) {
+    headerLogo.style.display = 'flex'; headerTitle.style.display = 'none'; backBtn.style.display = 'none';
+  }
+}
+
+// ── Settings ───────────────────────────────────────────────
+const savedKey = localStorage.getItem('rb_api_key') || '';
+if (savedKey) { $('settings-api-key').value = savedKey; setSettingsStatus('ok','✓ API key saved'); }
+
+$('settings-save-key').addEventListener('click', () => {
+  const k = $('settings-api-key').value.trim();
+  if (!k) { setSettingsStatus('err','Please enter a key'); return; }
+  localStorage.setItem('rb_api_key', k);
+  setSettingsStatus('ok','✓ Saved');
+});
+$('settings-api-key').addEventListener('keydown', e => { if(e.key==='Enter') $('settings-save-key').click(); });
+function setSettingsStatus(t, m){ const el=$('settings-api-status'); el.textContent=m; el.className='settings-status '+(t==='ok'?'ok':'err'); }
+
+$('settings-clear-history').addEventListener('click', () => {
+  if (!confirm('Clear all scan history? This cannot be undone.')) return;
+  localStorage.removeItem('rb_history');
+  updateSettingsView(); updateNavBadge(); showToast('History cleared');
+});
+
+function updateSettingsView() {
+  const h = loadHistory();
+  $('settings-history-desc').textContent = h.length ? `${h.length} saved scan${h.length!==1?'s':''}` : 'No scans yet';
+}
+
+// ── Mode ───────────────────────────────────────────────────
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+    clearResults();
+  });
+});
+
+// ── Images ─────────────────────────────────────────────────
+function addFiles(files) {
+  Array.from(files).slice(0, MAX_IMAGES - images.length).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      images.push({ base64: e.target.result.split(',')[1], mediaType: f.type, name: f.name, url: e.target.result });
+      renderGrid();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+cameraInput.addEventListener('change', e => { addFiles(e.target.files); cameraInput.value=''; });
+fileInput.addEventListener('change',   e => { addFiles(e.target.files); fileInput.value=''; });
+uploadEmpty.addEventListener('click', e => { if (!e.target.closest('.btn-upload')) fileInput.click(); });
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
+
+function renderGrid() {
+  const has = images.length > 0;
+  uploadEmpty.style.display = has ? 'none' : 'block';
+  imageGrid.style.display   = has ? 'grid' : 'none';
+  uploadZone.classList.toggle('has-images', has);
+  analyzeBtn.disabled = !has;
+  clearResults();
+  imageGrid.innerHTML = '';
+  images.forEach((img, i) => {
+    const d = document.createElement('div'); d.className='thumb';
+    d.innerHTML=`<img src="${esc(img.url)}" alt=""><button class="thumb-remove" data-i="${i}">✕</button><div class="thumb-label">${esc(img.name)}</div>`;
+    imageGrid.appendChild(d);
+  });
+  if (images.length < MAX_IMAGES) {
+    const a = document.createElement('label'); a.className='thumb-add'; a.htmlFor='file-input';
+    a.innerHTML='<span class="thumb-add-icon">+</span><span>Add</span>'; imageGrid.appendChild(a);
+  }
+  const foot = document.createElement('div'); foot.className='grid-footer';
+  foot.innerHTML=`<span>${images.length} image${images.length!==1?'s':''}</span><button class="btn-ghost" id="clear-imgs" style="padding:3px 9px;font-size:11px">Clear</button>`;
+  imageGrid.appendChild(foot);
+  imageGrid.querySelector('#clear-imgs')?.addEventListener('click', () => { images=[]; renderGrid(); });
+  imageGrid.querySelectorAll('.thumb-remove').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); images.splice(+b.dataset.i,1); renderGrid(); }));
+}
+
+// ── History ─────────────────────────────────────────────────
+function loadHistory() { return JSON.parse(localStorage.getItem('rb_history')||'[]'); }
+function saveHistoryData(h) { localStorage.setItem('rb_history', JSON.stringify(h)); }
+
+async function makeThumbnail(url) {
+  return new Promise(res => {
+    const img = new Image(); const sz=160;
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      const r = Math.min(sz/img.width, sz/img.height);
+      c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',0.65));
+    };
+    img.onerror = () => res(null); img.src = url;
+  });
+}
+
+async function saveToHistory(mode, result) {
+  const h = loadHistory();
+  const thumb = images.length ? await makeThumbnail(images[0].url) : null;
+  const entry = {
+    id: Date.now().toString(), thumbnail: thumb,
+    title: result.title||'Unknown', author: result.author||'',
+    date: new Date().toISOString(), mode, result, notes: ''
+  };
+  h.unshift(entry);
+  if (h.length > 50) h.splice(50);
+  saveHistoryData(h);
+  updateNavBadge();
+  return entry;
+}
+
+function updateNavBadge() {
+  const h = loadHistory();
+  navBadge.textContent = h.length;
+  navBadge.style.display = h.length ? 'flex' : 'none';
+}
+
+function renderHistoryList(query='') {
+  let h = loadHistory();
+  if (query) { const q=query.toLowerCase(); h=h.filter(e => (e.title+e.author).toLowerCase().includes(q)); }
+  if (!h.length) {
+    historyList.innerHTML=`<div class="history-empty"><div class="big-icon">${query?'🔍':'📋'}</div><p>${query?'No results for "'+esc(query)+'"':'No scans yet.<br>Analyze a book to build your history.'}</p></div>`;
+    return;
+  }
+  historyList.innerHTML = h.map(e => `
+    <div class="hist-card" data-id="${e.id}">
+      <div class="hist-thumb">${e.thumbnail?`<img src="${e.thumbnail}" alt="">`:'📖'}</div>
+      <div class="hist-body">
+        <div class="hist-title">${esc(e.title)}</div>
+        <div class="hist-author">${esc(e.author)}</div>
+        <div class="hist-meta"><span class="hist-date">${fmtDate(e.date)}</span><span class="hist-mode ${e.mode}">${e.mode}</span></div>
+        ${e.notes?`<div class="hist-notes-preview">📝 ${esc(e.notes)}</div>`:''}
+      </div>
+      <div class="hist-actions">
+        <button class="hist-note-btn ${e.notes?'has-note':''}" data-id="${e.id}" title="Notes">📝</button>
+        <button class="hist-del-btn" data-id="${e.id}" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+
+  historyList.querySelectorAll('.hist-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.hist-actions')) return;
+      openHistoryEntry(card.dataset.id);
+    });
+  });
+  historyList.querySelectorAll('.hist-del-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteEntry(b.dataset.id); }));
+  historyList.querySelectorAll('.hist-note-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openNotesModal(b.dataset.id); }));
+}
+
+function deleteEntry(id) {
+  const h = loadHistory().filter(e=>e.id!==id);
+  saveHistoryData(h); updateNavBadge(); renderHistoryList(historySearch.value);
+}
+
+function openHistoryEntry(id) {
+  const h = loadHistory();
+  const entry = h.find(e=>e.id===id);
+  if (!entry) return;
+  currentMode = entry.mode;
+  currentBook = entry.result;
+  viewingHistoryId = id;
+  isViewingHistory = true;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===entry.mode));
+  switchView('home');
+  modeSelector.style.display = 'none';
+  uploadZone.style.display = 'none';
+  analyzeBtn.style.display = 'none';
+  headerLogo.style.display = 'none';
+  headerTitle.style.display = 'block';
+  headerTitle.textContent = 'Saved Scan';
+  backBtn.style.display = 'block';
+  clearResults();
+  if (currentMode==='collector')  renderCollector(entry.result, entry);
+  else if (currentMode==='dealer') renderDealer(entry.result, entry);
+  else                             renderAcademic(entry.result, entry);
+}
+
+function exitHistoryMode() {
+  isViewingHistory = false; viewingHistoryId = null;
+  modeSelector.style.display = '';
+  uploadZone.style.display = '';
+  analyzeBtn.style.display = '';
+  headerLogo.style.display = 'flex';
+  headerTitle.style.display = 'none';
+  backBtn.style.display = 'none';
+  clearResults();
+}
+
+backBtn.addEventListener('click', () => { exitHistoryMode(); switchView('history'); });
+
+$('clear-history-btn').addEventListener('click', () => {
+  if (!confirm('Clear all scan history?')) return;
+  localStorage.removeItem('rb_history'); updateNavBadge(); renderHistoryList();
+});
+
+historySearch.addEventListener('input', e => renderHistoryList(e.target.value.trim()));
+
+// ── Notes Modal ────────────────────────────────────────────
+function openNotesModal(id) {
+  const h = loadHistory(); const entry = h.find(e=>e.id===id);
+  if (!entry) return;
+  editingNotesId = id;
+  $('notes-textarea').value = entry.notes || '';
+  notesModal.classList.add('open'); document.body.style.overflow='hidden';
+}
+function closeNotesModal() { notesModal.classList.remove('open'); document.body.style.overflow=''; editingNotesId=null; }
+$('notes-cancel').addEventListener('click', closeNotesModal);
+notesModal.addEventListener('click', e => { if(e.target===notesModal) closeNotesModal(); });
+$('notes-save').addEventListener('click', () => {
+  if (!editingNotesId) return;
+  const h=loadHistory(); const i=h.findIndex(e=>e.id===editingNotesId);
+  if (i>=0) { h[i].notes=$('notes-textarea').value.trim(); saveHistoryData(h); }
+  closeNotesModal(); if(currentView==='history') renderHistoryList(historySearch.value);
+  // Update inline notes textarea if open in results
+  const ta = $('notes-edit-textarea');
+  if (ta && viewingHistoryId===editingNotesId) ta.value = h[i]?.notes||'';
+  showToast('Notes saved');
+});
+
+// ── Alerts Modal ───────────────────────────────────────────
+function openAlerts(title) {
+  $('alert-item').value=title||''; $('modal-alerts-form').style.display='block'; $('modal-alerts-success').style.display='none';
+  alertsModal.classList.add('open'); document.body.style.overflow='hidden';
+}
+function closeAlerts() { alertsModal.classList.remove('open'); document.body.style.overflow=''; }
+$('alerts-cancel').addEventListener('click', closeAlerts);
+$('alerts-done').addEventListener('click', closeAlerts);
+alertsModal.addEventListener('click', e => { if(e.target===alertsModal) closeAlerts(); });
+$('alerts-submit').addEventListener('click', () => {
+  const em=$('alert-email').value.trim();
+  if (!em||!em.includes('@')) { $('alert-email').focus(); return; }
+  const w=JSON.parse(localStorage.getItem('rb_waitlist')||'[]');
+  w.push({email:em,item:$('alert-item').value,date:new Date().toISOString()});
+  localStorage.setItem('rb_waitlist',JSON.stringify(w));
+  $('modal-alerts-form').style.display='none'; $('modal-alerts-success').style.display='block';
+});
+
+// ── Loading Stages ─────────────────────────────────────────
+const STAGES = {
+  collector:['Examining images…','Identifying edition and printing…','Checking bibliographic records…','Researching auction history…','Estimating market value…','Preparing recommendation…'],
+  dealer:   ['Examining condition…','Drafting catalog entry…','Researching comparable sales…','Calculating suggested price…','Finalising description…'],
+  academic: ['Analysing bibliographic data…','Searching manuscript traditions…','Identifying institutional copies…','Compiling relevant scholarship…','Formatting citation…']
+};
+
+// ── Prompts ────────────────────────────────────────────────
+function buildPrompt(mode, n) {
+  const base = {
+    collector:`You are a senior rare book appraiser and bibliographer. Analyse these ${n} image(s) together.\nReturn ONLY valid JSON:\n{"item_type":"Book|Manuscript|Letter|Map|Broadside|Pamphlet|Musical Score|Print|Photograph|Ephemera|Other","title":"","author":"","year":"","publisher":"","place":"","edition":"","historical_significance":"","provenance_notes":"","rarity":"Unique|Extremely Rare|Very Rare|Rare|Scarce|Uncommon|Common","rarity_explanation":"","bibliographies":[""],"condition_factors":"","forgery_warnings":null,"valuation":{"auction":{"low":"","high":"","note":""},"dealer":{"low":"","high":"","note":""},"retail":{"low":"","high":"","note":""}},"buy_recommendation":"YES|MAYBE|NO","buy_rationale":"","confidence":"high|medium|low","confidence_note":""}`,
+    dealer:`You are a professional antiquarian bookseller. Analyse these ${n} image(s) together.\nReturn ONLY valid JSON:\n{"item_type":"Book|Manuscript|Letter|Map|Broadside|Pamphlet|Musical Score|Print|Photograph|Ephemera|Other","title":"","author":"","year":"","edition":"","catalog_description":"Full professional dealer-voice catalog description 3-6 paragraphs","condition_report":"Binding:\\nPages:\\nIllustrations:\\nOverall grade: Fine|Near Fine|Very Good+|Very Good|Good+|Good|Fair|Poor","suggested_retail":"","retail_justification":"","edition_notes":"","provenance_highlights":"","keywords":[""],"confidence":"high|medium|low","confidence_note":""}`,
+    academic:`You are a rare books librarian and bibliographic scholar. Analyse these ${n} image(s) together.\nReturn ONLY valid JSON:\n{"item_type":"Book|Manuscript|Letter|Map|Broadside|Pamphlet|Musical Score|Print|Photograph|Ephemera|Other","title":"","author":"","year":"","bibliographic_description":"Full MARC-compatible library catalog entry","scholarly_significance":"","critical_editions":null,"manuscript_tradition":null,"institutional_copies":[""],"relevant_scholarship":[{"author":"","title":"","journal":"","year":""}],"suggested_citation":"Chicago 17th ed citation","research_notes":"","confidence":"high|medium|low","confidence_note":""}`
+  };
+  return base[mode];
+}
+
+// ── Analyze ────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (analyzeBtn.disabled) return;
+  const apiKey = localStorage.getItem('rb_api_key') || '';
+  if (!apiKey) { switchView('settings'); $('settings-api-key').focus(); setSettingsStatus('err','Enter your API key to continue'); return; }
+  if (!images.length) return;
+
+  analyzeBtn.disabled=true; loading.classList.add('active'); clearResults();
+  const stages=STAGES[currentMode]; loadingStage.textContent=stages[0];
+  let si=0; const t=setInterval(()=>{ si=(si+1)%stages.length; loadingStage.textContent=stages[si]; },1900);
+
+  const content=[];
+  images.forEach(img=>content.push({type:'image',source:{type:'base64',media_type:img.mediaType,data:img.base64}}));
+  content.push({type:'text',text:buildPrompt(currentMode,images.length)});
+
+  try {
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:2048,messages:[{role:'user',content}]})
+    });
+    clearInterval(t);
+    if(!resp.ok){let m=`API error ${resp.status}`;try{const e=await resp.json();m=e?.error?.message||m;}catch(_){}throw new Error(m);}
+    const data=await resp.json();
+    const match=data.content[0].text.trim().match(/\{[\s\S]*\}/);
+    if(!match) throw new Error('Unexpected response format. Please try again.');
+    const result=JSON.parse(match[0]);
+    currentBook=result;
+    const entry=await saveToHistory(currentMode,result);
+    viewingHistoryId=entry.id;
+    if(currentMode==='collector')   renderCollector(result,entry);
+    else if(currentMode==='dealer') renderDealer(result,entry);
+    else                            renderAcademic(result,entry);
+  } catch(err) {
+    clearInterval(t);
+    errorBox.classList.add('active'); errorBody.textContent=err.message||'An unexpected error occurred.';
+  } finally {
+    loading.classList.remove('active'); analyzeBtn.disabled=false;
+  }
+});
+
+// ── Shared Render Helpers ──────────────────────────────────
+function rHdr(label) {
+  return `<div class="results-header fade-up"><span class="results-label">${label}</span><button class="btn-ghost" id="reset-btn">${isViewingHistory?'← Back':'+ New Search'}</button></div>`;
+}
+
+function heroCard(d) {
+  const chips=[d.year,d.edition,d.publisher&&d.place?`${d.publisher}, ${d.place}`:d.publisher||d.place].filter(Boolean).map(v=>`<span class="chip">${esc(v)}</span>`).join('');
+  return `<div class="card fade-up"><div class="card-hero">
+    <div class="card-hero-top">
+      <div>${d.item_type?`<span class="item-type-chip">${esc(d.item_type)}</span><br style="line-height:1.6">`:''}
+        <div class="book-title">${esc(d.title||'Unknown Title')}</div>
+        <div class="book-author">${esc(d.author||'')}</div>
+      </div>
+      ${d.confidence?`<span class="conf-badge conf-${d.confidence}">${esc(d.confidence)}</span>`:''}
+    </div>
+    ${chips?`<div class="meta-chips">${chips}</div>`:''}`;
+}
+
+function actionButtons() {
+  return `<div class="result-actions fade-up">
+    <button class="btn-action" id="copy-result-btn"><span class="btn-action-icon">📋</span><span class="btn-action-label">Copy Result</span></button>
+    <button class="btn-action" id="pdf-result-btn"><span class="btn-action-icon">⬇</span><span class="btn-action-label">Download PDF</span></button>
+    <button class="btn-action disabled" id="email-result-btn"><span class="btn-action-icon">📧</span><span class="btn-action-label">Email<br><span class="btn-pro-tag">Pro</span></span></button>
+  </div>`;
+}
+
+function notesSection(entry) {
+  const notes = entry?.notes||'';
+  return `<div class="notes-card fade-up">
+    <div class="notes-card-label">📝 Personal Notes</div>
+    <textarea class="notes-textarea" id="notes-edit-textarea" placeholder="Add notes — e.g. 'Bought for €45 at Drouot' or 'Passed — condition too poor'…">${esc(notes)}</textarea>
+    <div class="notes-save-row"><button class="btn-gold" id="save-notes-inline" style="padding:7px 16px;font-size:13px;border-radius:8px">Save</button></div>
+  </div>`;
+}
+
+function alertPromo(title) {
+  return `<div class="alert-promo fade-up"><div class="alert-icon">🔔</div><div class="alert-body">
+    <div class="alert-title">Book Search Alert <span class="premium-badge">Premium</span></div>
+    <div class="alert-desc">Get notified when <em>${esc(title||'this item')}</em> appears at auction or with dealers.</div>
+    <button class="btn-alert" id="set-alert-btn">Set Alert →</button>
+  </div></div>`;
+}
+
+function sharedDisclaimer(cn) {
+  return cn?`<div class="card fade-up"><div class="sec" style="background:var(--bg)"><div class="sec-label">ℹ Identification Notes</div><div class="sec-text" style="color:var(--text-dim);font-size:13px">${esc(cn)}</div></div></div>`:'';
+}
+
+function finalize(title, entry) {
+  resultsEl.classList.add('active');
+  $('reset-btn')?.addEventListener('click', () => { if(isViewingHistory){exitHistoryMode();switchView('history');}else resetApp(); });
+  $('set-alert-btn')?.addEventListener('click', () => openAlerts(title||''));
+  $('copy-result-btn')?.addEventListener('click', () => copyResult());
+  $('pdf-result-btn')?.addEventListener('click', () => generatePDF(entry));
+  $('email-result-btn')?.addEventListener('click', showEmailTooltip);
+  $('save-notes-inline')?.addEventListener('click', () => saveNotesInline());
+  setTimeout(() => resultsEl.scrollIntoView({behavior:'smooth',block:'start'}), 80);
+}
+
+function saveNotesInline() {
+  const id = viewingHistoryId; if(!id) return;
+  const h=loadHistory(); const i=h.findIndex(e=>e.id===id);
+  const notes=$('notes-edit-textarea')?.value.trim()||'';
+  if(i>=0){ h[i].notes=notes; saveHistoryData(h); }
+  showToast('Notes saved');
+}
+
+// ── Collector ──────────────────────────────────────────────
+function renderCollector(d, entry) {
+  const bibs=Array.isArray(d.bibliographies)&&d.bibliographies.length?`<ul class="bib-list">${d.bibliographies.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<span style="color:var(--text-muted);font-size:14px">No major bibliographies identified</span>`;
+  const v=d.valuation||{},au=v.auction||{},de=v.dealer||{},re=v.retail||{};
+  const bc=d.buy_recommendation==='YES'?'buy-yes':d.buy_recommendation==='NO'?'buy-no':'buy-maybe';
+  const bi=d.buy_recommendation==='YES'?'✅':d.buy_recommendation==='NO'?'❌':'🤔';
+  const bl=d.buy_recommendation==='YES'?'Buy':d.buy_recommendation==='NO'?'Pass':'Consider carefully';
+
+  resultsEl.innerHTML = rHdr('Collector Analysis') + heroCard(d) +
+  `<div class="sec"><div class="sec-label">⭐ Rarity</div><span class="rarity-pill ${rCls(d.rarity)}">${rEmoji(d.rarity)} ${esc(d.rarity||'Unknown')}</span>${d.rarity_explanation?`<div class="sec-sub">${esc(d.rarity_explanation)}</div>`:''}</div>
+  <div class="sec"><div class="sec-label">📜 Historical Significance</div><div class="sec-text">${esc(d.historical_significance||'—')}</div></div>
+  <div class="sec"><div class="sec-label">🔍 Provenance & Edition Notes</div><div class="sec-text">${esc(d.provenance_notes||'—')}</div></div>
+  <div class="sec"><div class="sec-label">📚 Bibliographies</div>${bibs}</div>
+  <div class="sec"><div class="sec-label">🏷 Condition Factors</div><div class="sec-text">${esc(d.condition_factors||'—')}</div></div>
+  ${d.forgery_warnings?`<div class="sec"><div class="sec-label">⚠ Forgery & Facsimile Warnings</div><div class="warning-box"><div class="warning-title"><span class="tag-warn">Warning</span></div>${esc(d.forgery_warnings)}</div></div>`:''}
+  </div><div class="card fade-up">
+  <div class="sec"><div class="sec-label">💰 Market Valuation</div><div class="val-grid">
+    <div class="val-card"><div class="val-market">Auction</div><div class="val-range">${fmt(au.low)} – ${fmt(au.high)}</div>${au.note?`<div class="val-note">${esc(au.note)}</div>`:''}</div>
+    <div class="val-card"><div class="val-market">Dealer</div><div class="val-range">${fmt(de.low)} – ${fmt(de.high)}</div>${de.note?`<div class="val-note">${esc(de.note)}</div>`:''}</div>
+    <div class="val-card"><div class="val-market">Retail</div><div class="val-range">${fmt(re.low)} – ${fmt(re.high)}</div>${re.note?`<div class="val-note">${esc(re.note)}</div>`:''}</div>
+  </div></div>
+  <div class="sec"><div class="sec-label">🛒 Should I Buy This?</div>
+    <div class="buy-card ${bc}"><div class="buy-icon">${bi}</div><div><div class="buy-verdict">${bl}</div><div class="buy-rationale">${esc(d.buy_rationale||'—')}</div></div></div>
+  </div>
+  <div class="sec"><div class="sec-label">🔗 Market Listings</div><div class="market-links">
+    <a class="market-link" href="https://www.abebooks.com/servlet/SearchResults?tn=${enc(d.title)}&an=${enc(d.author)}&sortby=1" target="_blank" rel="noopener"><span class="market-link-icon">📦</span><div class="market-link-body"><div class="market-link-name">AbeBooks</div><div class="market-link-desc">Search dealer listings worldwide</div></div><span class="market-link-arrow">↗</span></a>
+    <a class="market-link" href="https://www.livre-rare-book.com/results?search=${enc((d.title||'')+' '+(d.author||''))}" target="_blank" rel="noopener"><span class="market-link-icon">🇫🇷</span><div class="market-link-body"><div class="market-link-name">Livre Rare Book</div><div class="market-link-desc">European rare book marketplace</div></div><span class="market-link-arrow">↗</span></a>
+    <a class="market-link" href="https://www.drouot.com/recherche?q=${enc((d.title||'')+' '+(d.author||''))}" target="_blank" rel="noopener"><span class="market-link-icon">🔨</span><div class="market-link-body"><div class="market-link-name">Drouot</div><div class="market-link-desc">French auction house search</div></div><span class="market-link-arrow">↗</span></a>
+  </div></div></div>
+  ${actionButtons()}
+  ${notesSection(entry)}
+  ${alertPromo(d.title)}
+  ${sharedDisclaimer(d.confidence_note)}`;
+
+  finalize(d.title, entry);
+}
+
+// ── Dealer ─────────────────────────────────────────────────
+function renderDealer(d, entry) {
+  const kws=Array.isArray(d.keywords)&&d.keywords.length?`<div class="keyword-chips">${d.keywords.map(k=>`<span class="kw-chip">${esc(k)}</span>`).join('')}</div>`:'';
+  resultsEl.innerHTML = rHdr('Dealer Catalog') + heroCard(d) +
+  `<div class="sec"><div class="catalog-header"><div class="catalog-label">Catalog Description</div><button class="btn-copy-inline" id="copy-cat-btn">📋 Copy</button></div>
+    <div class="catalog-block">${esc(d.catalog_description||'—')}</div></div>
+  <div class="sec"><div class="sec-label">🏷 Condition Report</div><div class="sec-text" style="white-space:pre-line">${esc(d.condition_report||'—')}</div></div>
+  </div><div class="card fade-up">
+  <div class="sec"><div class="sec-label">💰 Suggested Retail</div>
+    <div class="price-highlight"><span class="price-amount">${d.suggested_retail?fmt(d.suggested_retail):'—'}</span><span class="price-label">suggested retail price</span></div>
+    <div class="sec-sub">${esc(d.retail_justification||'')}</div></div>
+  <div class="sec"><div class="sec-label">📖 Edition Notes</div><div class="sec-text">${esc(d.edition_notes||'—')}</div></div>
+  ${d.provenance_highlights?`<div class="sec"><div class="sec-label">🔍 Provenance Highlights</div><div class="sec-text">${esc(d.provenance_highlights)}</div></div>`:''}
+  ${kws?`<div class="sec"><div class="sec-label">🔎 SEO Keywords</div>${kws}</div>`:''}
+  </div>
+  ${actionButtons()}
+  ${notesSection(entry)}
+  ${alertPromo(d.title)}
+  ${sharedDisclaimer(d.confidence_note)}`;
+
+  finalize(d.title, entry);
+  $('copy-cat-btn')?.addEventListener('click', () => { inlineCopy(d.catalog_description||'','copy-cat-btn'); });
+}
+
+// ── Academic ───────────────────────────────────────────────
+function renderAcademic(d, entry) {
+  const sch=Array.isArray(d.relevant_scholarship)&&d.relevant_scholarship.length
+    ?`<div class="scholar-list">${d.relevant_scholarship.map(s=>`<div class="scholar-item"><div class="scholar-authors">${esc(s.author||'')}</div><div class="scholar-title">${esc(s.title||'')}</div><div class="scholar-meta">${[s.journal,s.year].filter(Boolean).join(', ')}</div></div>`).join('')}</div>`
+    :`<span style="color:var(--text-muted);font-size:14px">No scholarship identified</span>`;
+  const inst=Array.isArray(d.institutional_copies)&&d.institutional_copies.length
+    ?`<div class="inst-list">${d.institutional_copies.map(x=>`<div class="inst-item">${esc(x)}</div>`).join('')}</div>`
+    :`<span style="color:var(--text-muted);font-size:14px">No institutional copies identified</span>`;
+
+  resultsEl.innerHTML = rHdr('Academic & Institutional') + heroCard(d) +
+  `<div class="sec"><div class="catalog-header"><div class="catalog-label">Bibliographic Description</div><button class="btn-copy-inline" id="copy-bib-btn">📋 Copy</button></div>
+    <div class="bib-desc">${esc(d.bibliographic_description||'—')}</div></div>
+  <div class="sec"><div class="sec-label">🎓 Scholarly Significance</div><div class="sec-text">${esc(d.scholarly_significance||'—')}</div></div>
+  ${d.critical_editions?`<div class="sec"><div class="sec-label">📘 Critical Editions & Facsimiles</div><div class="sec-text">${esc(d.critical_editions)}</div></div>`:''}
+  ${d.manuscript_tradition?`<div class="sec"><div class="sec-label">📜 Manuscript Tradition</div><div class="sec-text">${esc(d.manuscript_tradition)}</div></div>`:''}
+  </div><div class="card fade-up">
+  <div class="sec"><div class="sec-label">🏛 Institutional Holdings</div>${inst}</div>
+  <div class="sec"><div class="sec-label">📖 Relevant Scholarship</div>${sch}</div>
+  ${d.suggested_citation?`<div class="sec"><div class="catalog-header"><div class="catalog-label">Citation (Chicago)</div><button class="btn-copy-inline" id="copy-cite-btn">📋 Copy</button></div><div class="citation-block">${esc(d.suggested_citation)}</div></div>`:''}
+  ${d.research_notes?`<div class="sec"><div class="sec-label">🔬 Research Notes</div><div class="sec-text">${esc(d.research_notes)}</div></div>`:''}
+  </div>
+  ${actionButtons()}
+  ${notesSection(entry)}
+  ${alertPromo(d.title)}
+  ${sharedDisclaimer(d.confidence_note)}`;
+
+  finalize(d.title, entry);
+  $('copy-bib-btn')?.addEventListener('click', ()=>inlineCopy(d.bibliographic_description||'','copy-bib-btn'));
+  $('copy-cite-btn')?.addEventListener('click', ()=>inlineCopy(d.suggested_citation||'','copy-cite-btn'));
+}
+
+// ── Copy Full Result ───────────────────────────────────────
+function copyResult() {
+  if(!currentBook) return;
+  const d=currentBook, mode=currentMode;
+  const lines=['RAREBOOK ANALYSIS','='.repeat(54),''];
+  lines.push(`Mode:  ${mode.charAt(0).toUpperCase()+mode.slice(1)}`);
+  lines.push(`Date:  ${new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}`);
+  if(d.item_type) lines.push(`Type:  ${d.item_type}`);
+  lines.push('');
+  if(mode==='collector'||mode==='dealer') {
+    if(d.title)   lines.push(`Title:     ${d.title}`);
+    if(d.author)  lines.push(`Author:    ${d.author}`);
+    if(d.year)    lines.push(`Year:      ${d.year}`);
+    if(d.edition) lines.push(`Edition:   ${d.edition}`);
+    if(d.publisher||d.place) lines.push(`Publisher: ${[d.publisher,d.place].filter(Boolean).join(', ')}`);
+    lines.push('');
+  }
+  if(mode==='collector') {
+    if(d.rarity) lines.push(`Rarity: ${d.rarity}`,'');
+    sect(lines,'HISTORICAL SIGNIFICANCE',d.historical_significance);
+    sect(lines,'PROVENANCE & EDITION NOTES',d.provenance_notes);
+    if(Array.isArray(d.bibliographies)&&d.bibliographies.length){ lines.push('BIBLIOGRAPHIES'); d.bibliographies.forEach(b=>lines.push(`  • ${b}`)); lines.push(''); }
+    sect(lines,'CONDITION FACTORS',d.condition_factors);
+    if(d.forgery_warnings) sect(lines,'⚠ FORGERY / FACSIMILE WARNINGS',d.forgery_warnings);
+    const v=d.valuation||{};
+    lines.push('MARKET VALUATION');
+    if(v.auction) lines.push(`  Auction: ${fmt(v.auction.low)} – ${fmt(v.auction.high)}  ${v.auction.note||''}`);
+    if(v.dealer)  lines.push(`  Dealer:  ${fmt(v.dealer.low)} – ${fmt(v.dealer.high)}  ${v.dealer.note||''}`);
+    if(v.retail)  lines.push(`  Retail:  ${fmt(v.retail.low)} – ${fmt(v.retail.high)}  ${v.retail.note||''}`);
+    lines.push('');
+    if(d.buy_recommendation) lines.push(`BUY RECOMMENDATION: ${d.buy_recommendation}`,'');
+    sect(lines,'RATIONALE',d.buy_rationale);
+  } else if(mode==='dealer') {
+    sect(lines,'CATALOG DESCRIPTION',d.catalog_description);
+    sect(lines,'CONDITION REPORT',d.condition_report);
+    if(d.suggested_retail) lines.push(`SUGGESTED RETAIL: ${fmt(d.suggested_retail)}`,'');
+    sect(lines,'RETAIL JUSTIFICATION',d.retail_justification);
+    sect(lines,'EDITION NOTES',d.edition_notes);
+    sect(lines,'PROVENANCE HIGHLIGHTS',d.provenance_highlights);
+    if(Array.isArray(d.keywords)&&d.keywords.length){ lines.push('KEYWORDS: '+d.keywords.join(', '),''); }
+  } else {
+    if(d.title)  lines.push(`Title:  ${d.title}`);
+    if(d.author) lines.push(`Author: ${d.author}`);
+    if(d.year)   lines.push(`Year:   ${d.year}`);
+    lines.push('');
+    sect(lines,'BIBLIOGRAPHIC DESCRIPTION',d.bibliographic_description);
+    sect(lines,'SCHOLARLY SIGNIFICANCE',d.scholarly_significance);
+    sect(lines,'CRITICAL EDITIONS',d.critical_editions);
+    sect(lines,'MANUSCRIPT TRADITION',d.manuscript_tradition);
+    if(Array.isArray(d.institutional_copies)&&d.institutional_copies.length){ lines.push('INSTITUTIONAL HOLDINGS'); d.institutional_copies.forEach(x=>lines.push(`  🏛 ${x}`)); lines.push(''); }
+    if(Array.isArray(d.relevant_scholarship)&&d.relevant_scholarship.length){ lines.push('RELEVANT SCHOLARSHIP'); d.relevant_scholarship.forEach(s=>lines.push(`  ${s.author||''} "${s.title||''}" ${[s.journal,s.year].filter(Boolean).join(', ')}`)); lines.push(''); }
+    sect(lines,'SUGGESTED CITATION',d.suggested_citation);
+    sect(lines,'RESEARCH NOTES',d.research_notes);
+  }
+  if(d.confidence) lines.push(`Confidence: ${d.confidence}${d.confidence_note?' — '+d.confidence_note:''}`, '');
+  lines.push('─'.repeat(54));
+  lines.push('Valuations are estimates only. Consult a certified rare book appraiser for insurance or sale purposes.');
+  lines.push('Generated by RareBook — rarebook.app');
+
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
+    const btn=$('copy-result-btn'); if(!btn) return;
+    btn.classList.add('success'); btn.querySelector('.btn-action-icon').textContent='✓'; btn.querySelector('.btn-action-label').textContent='Copied!';
+    setTimeout(()=>{ btn.classList.remove('success'); btn.querySelector('.btn-action-icon').textContent='📋'; btn.querySelector('.btn-action-label').textContent='Copy Result'; },2500);
+  }).catch(()=>showToast('Copy failed — please try again'));
+}
+
+function sect(lines,label,val){ if(val){ lines.push(label); lines.push(val); lines.push(''); } }
+
+// ── PDF Generation ─────────────────────────────────────────
+async function generatePDF(entry) {
+  if (!window.jspdf) { showToast('PDF library not loaded — check connection'); return; }
+  const { jsPDF } = window.jspdf;
+  const d = currentBook, mode = currentMode;
+  if (!d) return;
+
+  const doc = new jsPDF('p','mm','a4');
+  const PW=210, PH=297, ML=18, MR=18, MT=8;
+  const CW=PW-ML-MR;
+  let y=MT;
+
+  const GOLD=[201,168,76], DARK=[30,24,16], MID=[100,88,68], LITE=[240,235,225], DIM=[150,135,110], BG=[249,245,238];
+
+  function clr(...rgb){ doc.setTextColor(...rgb); }
+  function fill(...rgb){ doc.setFillColor(...rgb); }
+  function drw(...rgb){ doc.setDrawColor(...rgb); }
+  function fnt(size,style='normal'){ doc.setFont('helvetica',style); doc.setFontSize(size); }
+  function txt(text,x,yy,opts={}){ if(!text) return; doc.text(String(text),x,yy,opts); }
+  function wrap(text,maxW){ return doc.splitTextToSize(String(text||''),maxW); }
+
+  function needsPage(h){ if(y+h>PH-22){ doc.addPage(); pageHeader(); } }
+
+  function pageHeader(){
+    fill(...GOLD); doc.rect(0,0,PW,12,'F');
+    fnt(8,'bold'); clr(...DARK);
+    txt('RareBook',ML,8.5);
+    const modes={collector:'Collector Appraisal',dealer:'Dealer Catalog Entry',academic:'Academic Report'};
+    const rLabel=(modes[mode]||mode)+' · '+new Date().toLocaleDateString('en-GB',{year:'numeric',month:'short',day:'numeric'});
+    txt(rLabel,PW-MR,8.5,{align:'right'});
+    y=18;
+  }
+
+  // ── Page 1 header ──
+  pageHeader();
+
+  // Thumbnail
+  let thumbW=0, thumbH=0, thumbDone=false;
+  if(entry?.thumbnail){
+    try{
+      const tw=42, th=42;
+      doc.addImage(entry.thumbnail,'JPEG',PW-MR-tw,y,tw,th);
+      thumbW=tw+4; thumbH=th; thumbDone=true;
+    }catch(_){}
+  }
+
+  const textW = CW - (thumbDone?thumbW:0);
+
+  // Title block
+  const titleLines=wrap(d.title||'Unknown Title',textW);
+  fnt(18,'bold'); clr(...DARK);
+  doc.text(titleLines,ML,y+6);
+  y+=titleLines.length*7.5+2;
+  if(d.author){ fnt(12,'bold'); clr(...GOLD); txt(d.author,ML,y); y+=6; }
+  const metas=[d.year,d.edition,d.publisher&&d.place?`${d.publisher}, ${d.place}`:d.publisher||d.place].filter(Boolean).join('  ·  ');
+  if(metas){ fnt(9,'normal'); clr(...MID); txt(metas,ML,y); y+=5.5; }
+  if(d.item_type){ fnt(8,'bold'); clr(...DIM); txt(d.item_type.toUpperCase(),ML,y); y+=5; }
+  y=Math.max(y, thumbDone?20+thumbH:y)+6;
+
+  // Divider
+  drw(...GOLD); doc.setLineWidth(0.5); doc.line(ML,y,ML+CW,y); y+=6;
+
+  function section(label, content, opts={}){
+    if(!content||(Array.isArray(content)&&!content.length)) return;
+    needsPage(18);
+    fill(...LITE); doc.rect(ML,y-3,CW,9,'F');
+    fnt(7.5,'bold'); clr(...MID);
+    txt(label.toUpperCase(),ML+3,y+4);
+    y+=11;
+    if(typeof content==='string'){
+      const lns=wrap(content,CW);
+      needsPage(lns.length*4.8);
+      fnt(opts.size||9.5,'normal'); clr(...DARK);
+      doc.text(lns,ML,y);
+      y+=lns.length*4.8+6;
+    } else if(Array.isArray(content)){
+      content.forEach(item=>{
+        if(!item) return;
+        const lns=wrap('• '+(typeof item==='string'?item:`${item.author||''} "${item.title||''}" ${[item.journal,item.year].filter(Boolean).join(', ')}`),CW-4);
+        needsPage(lns.length*4.8);
+        fnt(9,'normal'); clr(...DARK);
+        doc.text(lns,ML+3,y);
+        y+=lns.length*4.8+3;
+      });
+      y+=3;
+    }
+  }
+
+  if(mode==='collector'){
+    if(d.rarity){ fnt(10,'bold'); clr(...GOLD); txt(`Rarity: ${d.rarity}`,ML,y); y+=6; }
+    section('Historical Significance',d.historical_significance);
+    section('Provenance & Edition Notes',d.provenance_notes);
+    section('Known Bibliographies',d.bibliographies);
+    section('Condition Factors',d.condition_factors);
+    if(d.forgery_warnings) section('⚠ Forgery / Facsimile Warnings',d.forgery_warnings);
+    // Valuation table
+    const v=d.valuation||{},cols=[{l:'AUCTION',d:v.auction||{}},{l:'DEALER',d:v.dealer||{}},{l:'RETAIL',d:v.retail||{}}];
+    needsPage(38);
+    fill(...LITE); doc.rect(ML,y-3,CW,9,'F');
+    fnt(7.5,'bold'); clr(...MID); txt('MARKET VALUATION',ML+3,y+4); y+=11;
+    const cw=CW/3;
+    cols.forEach((c,i)=>{
+      const cx=ML+i*cw;
+      fill(...DARK); doc.rect(cx,y-2,cw-2,10,'F');
+      fnt(7,'bold'); clr(...GOLD); txt(c.l,cx+cw/2,y+5.5,{align:'center'});
+    });
+    y+=14;
+    cols.forEach((c,i)=>{
+      const cx=ML+i*cw, range=`${fmt(c.d.low)} – ${fmt(c.d.high)}`;
+      fnt(9,'bold'); clr(...GOLD); txt(range,cx+cw/2,y+5,{align:'center'});
+      if(c.d.note){ const nl=wrap(c.d.note,cw-4); fnt(7,'normal'); clr(...DIM); doc.text(nl,cx+2,y+10); }
+    });
+    y+=28;
+    if(d.buy_recommendation){
+      needsPage(20);
+      const bcolor=d.buy_recommendation==='YES'?[90,170,128]:d.buy_recommendation==='NO'?[200,80,80]:[180,140,50];
+      fill(...bcolor); doc.rect(ML,y-2,CW,14,'F');
+      fnt(10,'bold'); clr(255,255,255);
+      const verdict=d.buy_recommendation==='YES'?'Recommendation: BUY':d.buy_recommendation==='NO'?'Recommendation: PASS':'Recommendation: CONSIDER CAREFULLY';
+      txt(verdict,ML+6,y+8); y+=17;
+      if(d.buy_rationale){ section('',d.buy_rationale); }
+    }
+  } else if(mode==='dealer'){
+    section('Catalog Description',d.catalog_description,{size:9.5});
+    section('Condition Report',d.condition_report);
+    if(d.suggested_retail){ needsPage(14); fnt(13,'bold'); clr(...GOLD); txt(`Suggested Retail: ${fmt(d.suggested_retail)}`,ML,y); y+=8; }
+    section('Retail Justification',d.retail_justification);
+    section('Edition Notes',d.edition_notes);
+    section('Provenance Highlights',d.provenance_highlights);
+    if(Array.isArray(d.keywords)&&d.keywords.length){ section('Keywords',d.keywords.join(', ')); }
+  } else {
+    section('Bibliographic Description',d.bibliographic_description,{size:9});
+    section('Scholarly Significance',d.scholarly_significance);
+    if(d.critical_editions) section('Critical Editions & Facsimiles',d.critical_editions);
+    if(d.manuscript_tradition) section('Manuscript Tradition',d.manuscript_tradition);
+    if(Array.isArray(d.institutional_copies)&&d.institutional_copies.length) section('Institutional Holdings',d.institutional_copies);
+    if(Array.isArray(d.relevant_scholarship)&&d.relevant_scholarship.length) section('Relevant Scholarship',d.relevant_scholarship);
+    if(d.suggested_citation) section('Suggested Citation (Chicago)',d.suggested_citation);
+    if(d.research_notes) section('Research Notes',d.research_notes);
+  }
+
+  if(d.confidence){
+    needsPage(14); fnt(8,'normal'); clr(...DIM);
+    txt(`Identification confidence: ${d.confidence}${d.confidence_note?' — '+d.confidence_note:''}`,ML,y); y+=8;
+  }
+
+  // Footer on all pages
+  const total=doc.internal.getNumberOfPages();
+  for(let p=1;p<=total;p++){
+    doc.setPage(p);
+    fill(...DARK); doc.rect(0,PH-14,PW,14,'F');
+    fnt(6.5,'normal'); clr(...DIM);
+    const disc='Valuations are market estimates only. Consult a certified rare book appraiser for insurance, authentication or sale purposes.';
+    txt(disc,ML,PH-6,{maxWidth:CW-20});
+    fnt(7,'normal'); clr(...MID);
+    txt(`Page ${p} of ${total}`,PW-MR,PH-6,{align:'right'});
+  }
+
+  const slug=(d.title||'rarebook').replace(/[^a-zA-Z0-9]/g,'-').toLowerCase().slice(0,40);
+  doc.save(`rarebook-${mode}-${slug}.pdf`);
+  showToast('PDF downloaded');
+}
+
+// ── Email Tooltip ──────────────────────────────────────────
+function showEmailTooltip(e) {
+  const btn=e.currentTarget;
+  const existing=btn.querySelector('.tooltip-popup');
+  if(existing){ existing.remove(); return; }
+  const tip=document.createElement('div');
+  tip.className='tooltip-popup';
+  tip.textContent='Email delivery coming in a future Pro update.';
+  btn.appendChild(tip);
+  setTimeout(()=>tip.remove(),3000);
+}
+
+// ── Inline copy ────────────────────────────────────────────
+function inlineCopy(txt,btnId){
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b=$(btnId); if(!b) return;
+    b.innerHTML='✓ Copied'; b.classList.add('copied');
+    setTimeout(()=>{ b.innerHTML='📋 Copy'; b.classList.remove('copied'); },2000);
+  }).catch(()=>showToast('Copy failed'));
+}
+
+// ── Utilities ──────────────────────────────────────────────
+function clearResults(){ resultsEl.classList.remove('active'); resultsEl.innerHTML=''; errorBox.classList.remove('active'); currentBook=null; }
+function resetApp(){ images=[]; renderGrid(); clearResults(); viewingHistoryId=null; window.scrollTo({top:0,behavior:'smooth'}); }
+
+function esc(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function enc(s){ return encodeURIComponent((s||'').trim()); }
+function fmt(v){
+  if(v==null||v==='') return 'N/A';
+  const n=parseFloat(String(v).replace(/[^0-9.]/g,''));
+  if(isNaN(n)) return String(v);
+  if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K';
+  return '$'+n.toLocaleString();
+}
+function rCls(r){ r=(r||'').toLowerCase(); if(r.includes('unique')) return 'r-unique'; if(r.includes('extremely')) return 'r-extremely-rare'; if(r.includes('very')) return 'r-very-rare'; if(r.includes('rare')) return 'r-rare'; if(r.includes('scarce')) return 'r-scarce'; if(r.includes('uncommon')) return 'r-uncommon'; return 'r-common'; }
+function rEmoji(r){ r=(r||'').toLowerCase(); if(r.includes('unique')) return '💎'; if(r.includes('extremely')) return '🔴'; if(r.includes('very')) return '🟠'; if(r.includes('rare')) return '🟡'; if(r.includes('scarce')) return '🟢'; if(r.includes('uncommon')) return '🔵'; return '⚪'; }
+function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(_){ return iso; } }
+function showToast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2700); }
+
+// ── Init ───────────────────────────────────────────────────
+updateNavBadge();
+
+// ── PWA Service Worker ─────────────────────────────────────
+if('serviceWorker' in navigator){
+  try{
+    const sw=`const C='rb-v3';self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('fetch',e=>{if(e.request.url.includes('anthropic.com')||e.request.url.includes('cdnjs'))return;e.respondWith(caches.open(C).then(c=>c.match(e.request).then(h=>{const n=fetch(e.request).then(r=>{c.put(e.request,r.clone());return r;});return h||n;})));});`;
+    navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
+  }catch(_){}
+}
+</script>
+</body>
+</html>
