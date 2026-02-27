@@ -637,7 +637,7 @@ body::before{
 </head>
 <body>
 <div id="sidebar" class="sidebar hidden"></div>
-<div id="app"><div style="color:#94a3b8;padding:24px;font-family:monospace">Loading…</div></div>
+<div id="app"></div>
 <div id="modal-overlay" class="modal-overlay">
   <div class="modal-sheet" id="modal-sheet">
     <div class="modal-handle"></div>
@@ -3383,14 +3383,20 @@ async function subscribeLeague(leagueId) {
 
 // ==================== INIT ==================================
 function init() {
-  let authHandled = false;
+  // Show login immediately — don't wait for Supabase
+  route('auth');
 
-  async function handleSession(event, session) {
-    authHandled = true;
+  // Then check if there's an existing session in the background
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session && !S.authUser) afterLogin(session.user).catch(console.error);
+  }).catch(err => console.error('getSession:', err));
+
+  // Listen for future sign-in / sign-out events
+  sb.auth.onAuthStateChange(async (event, session) => {
     try {
-      if (session) {
-        if (!S.authUser) await afterLogin(session.user);
-      } else {
+      if (event === 'SIGNED_IN' && session && !S.authUser) {
+        await afterLogin(session.user);
+      } else if (event === 'SIGNED_OUT') {
         S.user = null; S.authUser = null; S.league = null;
         S.userLeagues = []; S.isAdmin = false; S.unread = 0;
         for (const ch of S.channels) await sb.removeChannel(ch);
@@ -3399,32 +3405,10 @@ function init() {
         route('auth');
       }
     } catch(err) {
-      document.getElementById('app').innerHTML =
-        `<div style="color:#f87171;padding:24px;font-family:monospace"><b>Init error:</b> ${err.message}<br><pre style="white-space:pre-wrap;margin-top:8px">${err.stack||''}</pre></div>`;
-    }
-  }
-
-  sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-      await handleSession(event, session);
-    } else if (event === 'SIGNED_OUT') {
-      await handleSession(event, null);
+      console.error('onAuthStateChange error:', err);
+      toast('Something went wrong. Please refresh.', 'err');
     }
   });
-
-  // Fallback: onAuthStateChange can be slow — use getSession() directly after 2s
-  setTimeout(async () => {
-    if (authHandled) return;
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!authHandled) await handleSession('fallback', session);
-    } catch(err) {
-      if (!authHandled) {
-        document.getElementById('app').innerHTML =
-          `<div style="color:#f87171;padding:24px;font-family:monospace"><b>Connection error:</b> ${err.message}</div>`;
-      }
-    }
-  }, 2000);
 }
 
 init();
