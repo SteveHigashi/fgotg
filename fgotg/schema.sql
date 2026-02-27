@@ -86,6 +86,7 @@ CREATE TABLE public.picks (
   darkhorse    text,
   is_shutout   boolean NOT NULL DEFAULT false,
   play_type    text NOT NULL DEFAULT 'es' CHECK (play_type IN ('es','pp','pk')),
+  dh_play_type text NOT NULL DEFAULT 'es' CHECK (dh_play_type IN ('es','pp','pk')),
   pts          smallint,
   breakdown    jsonb DEFAULT '{}'::jsonb,
   scored       boolean NOT NULL DEFAULT false,

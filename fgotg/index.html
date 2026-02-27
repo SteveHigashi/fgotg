@@ -637,7 +637,7 @@ body::before{
 </head>
 <body>
 <div id="sidebar" class="sidebar hidden"></div>
-<div id="app"></div>
+<div id="app"><div style="color:#94a3b8;padding:24px;font-family:monospace">Loading…</div></div>
 <div id="modal-overlay" class="modal-overlay">
   <div class="modal-sheet" id="modal-sheet">
     <div class="modal-handle"></div>
@@ -653,10 +653,20 @@ body::before{
 // Single-file app · Supabase backend · © 2025
 // ============================================================
 
+window.onerror = function(msg, src, line, col, err) {
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = `<div style="color:#f87171;padding:24px;font-family:monospace;line-height:1.6"><b>JS Error:</b> ${msg}<br>Line ${line} — ${src}<br><pre style="margin-top:8px;white-space:pre-wrap">${err?.stack||''}</pre></div>`;
+};
+window.onunhandledrejection = function(e) {
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = `<div style="color:#f87171;padding:24px;font-family:monospace"><b>Unhandled rejection:</b> ${e.reason?.message||e.reason}</div>`;
+};
+
 // =================== SUPABASE CONFIG ========================
 // Fill in from: Supabase Dashboard → Project Settings → API
-const SUPABASE_URL      = 'https://YOUR_PROJECT_REF.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';
+const SUPABASE_URL      = 'https://gsectdeyspqwlrkrdzrm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzZWN0ZGV5c3Bxd2xya3JkenJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2MTQsImV4cCI6MjA4Nzc2MjYxNH0.EpG7c-p98MfYSOO0gGL2EBUWbWzTVTdIER3s02xQiS8';
+if (!window.supabase) throw new Error('Supabase CDN failed to load — check your internet connection.');
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ===================== CONVERTERS ===========================
@@ -732,7 +742,7 @@ const BASE_ROSTERS = {
   MTL:['Nick Suzuki','Juraj Slafkovsky','Cole Caufield','Kirby Dach','Josh Anderson','Kaiden Guhle','Sam Montembeault'],
   NSH:['Roman Josi','Filip Forsberg','Ryan O\'Reilly','Jonathan Marchessault','Tommy Novak','Juuse Saros','Dante Fabbro'],
   NJD:['Nico Hischier','Jack Hughes','Jesper Bratt','Timo Meier','Dougie Hamilton','Damon Severson','Vitek Vanecek'],
-  NYI:['Mathew Barzal','Bo Horvat','Kyle Palmieri','Anders Lee','Noah Dobson','Ryan Pulock','Ilya Sorokin'],
+  NYI:['Mathew Barzal','Bo Horvat','Kyle Palmieri','Anders Lee','Noah Dobson','Ryan Pulock','Ilya Sorokin','Matthew Schaefer','Simon Holmstrom','Hudson Fasching','Pierre Engvall','Maxim Tsyplakov','Cal Clutterbuck'],
   NYR:['Artemi Panarin','Chris Kreider','Mika Zibanejad','Vincent Trocheck','Adam Fox','K\'Andre Miller','Igor Shesterkin'],
   OTT:['Tim Stutzle','Brady Tkachuk','Claude Giroux','Josh Norris','Jake Sanderson','Thomas Chabot','Cam Talbot'],
   PHI:['Sean Couturier','Travis Konecny','Joel Farabee','Travis Sanheim','Ivan Provorov','Carter Hart','Owen Tippett'],
@@ -882,6 +892,10 @@ const DB = {
     const {error} = await sb.from('picks').update(toSnake(patch)).eq('id', id);
     return !error;
   },
+  async deletePick(id) {
+    const {error} = await sb.from('picks').delete().eq('id', id);
+    return !error;
+  },
   async gamePicks(gameId) {
     const {data} = await sb.from('picks').select('*').eq('game_id', gameId);
     return (data||[]).map(toCamel);
@@ -1002,9 +1016,10 @@ const Score = {
     }
     const dhScored = pick.darkhorse && pick.darkhorse === result.firstScorer;
     const regScored = !dhScored && pick.regular === result.firstScorer;
+    const dhPt = pick.dhPlayType || pick.playType; // dhPlayType is the darkhorse's own play type prediction
     if (dhScored) {
       br.darkhorse = 3; pts += 3;
-      if (pick.playType === result.firstPlayType) { const pp = result.firstPlayType === 'pk' ? 3 : 1; br.playType = pp; pts += pp; }
+      if (dhPt === result.firstPlayType) { const pp = result.firstPlayType === 'pk' ? 3 : 1; br.playType = pp; pts += pp; }
       if (result.secondScorer && pick.regular === result.secondScorer) {
         br.bonusScorer = 1; pts += 1;
         if (pick.playType === result.secondPlayType) { const pp2 = result.secondPlayType === 'pk' ? 3 : 1; br.bonusPlayType = pp2; pts += pp2; }
@@ -1809,6 +1824,7 @@ async function renderPickEntry(gameId) {
   const leagueId = game.leagueId || S.league?.id;
   const team = TEAMS[S.user.teamId];
   const isLocked = game.status === 'locked' || Date.now() >= new Date(game.deadline).getTime();
+  const isEditing = !!S.params.editing;
 
   const [existingPick, result, players, ineligibleRaw] = await Promise.all([
     DB.getPickForGame(S.user.id, gameId),
@@ -1816,7 +1832,8 @@ async function renderPickEntry(gameId) {
     DB.getPlayers(leagueId),
     DB.getIneligible(leagueId),
   ]);
-  const ineligible = ineligibleRaw.map(i => i.player);
+  const ineligible = ineligibleRaw.map(i => i.playerName);
+  const showForm = !isLocked && (!existingPick || isEditing);
 
   document.getElementById('app').innerHTML = `
   ${renderHeader(`vs ${esc(game.opponent)}`, true)}
@@ -1829,7 +1846,7 @@ async function renderPickEntry(gameId) {
           <div class="text-lg">${esc(team?.abbr||'')} vs ${esc(game.opponent)}</div>
         </div>
         ${isLocked ? '<span class="pill pill-err">' + ico('lock') + ' LOCKED</span>'
-          : existingPick ? '<span class="pill pill-ok">✓ Submitted</span>'
+          : existingPick && !isEditing ? '<span class="pill pill-ok">✓ Submitted</span>'
           : '<span class="pill pill-warn">Open</span>'}
       </div>
       <div class="text-xs text-muted">🏒 Puck Drop: ${fmtDateTime(game.puckDrop)}</div>
@@ -1840,20 +1857,28 @@ async function renderPickEntry(gameId) {
 
     ${result && existingPick ? renderPickResult(existingPick, result) : ''}
 
-    ${!result && (existingPick || isLocked) ? `
+    ${!result && existingPick && isLocked ? `
     <div class="section-label">Your Picks</div>
     ${renderPickSummaryFull(existingPick)}
-    ${!result ? '<div class="text-center text-xs text-muted mt-12">Waiting for game result to be posted...</div>' : ''}
+    <div class="text-center text-xs text-muted mt-12">Waiting for game result to be posted...</div>
     ` : ''}
 
-    ${!isLocked && !existingPick ? renderPickForm(gameId, players, ineligible) : ''}
-    ${!isLocked && existingPick && !result ? `
-    <div class="text-center mt-12">
-      <button class="btn btn-ghost btn-sm" onclick="editPick('${existingPick.id}','${gameId}')">Edit Pick</button>
+    ${!result && existingPick && !isLocked && !isEditing ? `
+    <div class="section-label">Your Picks</div>
+    ${renderPickSummaryFull(existingPick)}
+    <div class="flex gap-8 justify-center mt-12">
+      <button class="btn btn-ghost btn-sm" onclick="startEditPick('${gameId}')">✏️ Change Pick</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--err)" onclick="confirmDeletePick('${existingPick.id}','${gameId}')">🗑 Delete Pick</button>
     </div>` : ''}
+
+    ${showForm ? renderPickForm(gameId, players, ineligible) : ''}
 
   </div>
   ${renderNav('picks')}`;
+
+  if (showForm && isEditing && existingPick) {
+    prefillPickForm(existingPick);
+  }
 }
 
 function renderResultBanner(result) {
@@ -1882,8 +1907,8 @@ function renderPickResult(pick, result) {
       ? {label: 'Shutout Call', val: '🥅 Shutout', pts: breakdown.shutout||0, correct: !!breakdown.shutout}
       : {label: 'Darkhorse Pick', val: esc(pick.darkhorse), pts: breakdown.darkhorse||0,
          correct: result.isShutout ? null : pick.darkhorse === result.firstScorer},
-    {label: 'Play Type', val: playTypeLabel(pick.playType), pts: breakdown.playType||0,
-     correct: pick.playType === (result.isShutout ? null : result.firstPlayType)},
+    {label: 'Play Type', val: playTypeLabel(breakdown.darkhorse ? (pick.dhPlayType||pick.playType) : pick.playType), pts: breakdown.playType||0,
+     correct: !result.isShutout && (breakdown.darkhorse ? (pick.dhPlayType||pick.playType) : pick.playType) === result.firstPlayType},
   ];
   if (breakdown.bonusScorer != null) {
     rows.push({label: 'Bonus: 2nd Goal Scorer', val: esc(pick.regular), pts: breakdown.bonusScorer, correct: true});
@@ -1933,79 +1958,94 @@ function renderPickSummaryFull(pick) {
     <div class="pick-slot">
       <div class="pick-slot-icon" style="background:var(--surf3)">⚡</div>
       <div class="flex-1">
-        <div class="pick-slot-label">Play Type</div>
+        <div class="pick-slot-label">Regular Play Type</div>
         <div class="pick-slot-value">${playTypeLabel(pick.playType)}</div>
       </div>
     </div>
+    ${!pick.isShutout ? `
+    <div class="pick-slot">
+      <div class="pick-slot-icon" style="background:var(--surf3)">⚡</div>
+      <div class="flex-1">
+        <div class="pick-slot-label">Darkhorse Play Type</div>
+        <div class="pick-slot-value">${playTypeLabel(pick.dhPlayType||'es')}</div>
+      </div>
+    </div>` : ''}
     <div class="text-xs text-muted mt-8" style="text-align:right">Submitted ${fmtDateTime(pick.submittedAt)}</div>
   </div>`;
 }
 
 function renderPickForm(gameId, players, ineligible) {
-  window._pickState = { gameId, regular: '', darkhorse: '', isShutout: false, playType: 'es' };
+  window._pickState = { gameId, regular: '', darkhorse: '', isShutout: false, playType: 'es', dhPlayType: 'es' };
   const sortedPlayers = [...players].sort();
+  const ptBtns = (id, fn) => `
+    <div class="toggle-group mb-12" id="${id}">
+      <button class="toggle-item active" onclick="${fn}('es',this)">Even Str.</button>
+      <button class="toggle-item" onclick="${fn}('pp',this)">Power Play</button>
+      <button class="toggle-item" onclick="${fn}('pk',this)" title="Shorthanded goal = +3 pts">Pen. Kill 🌟</button>
+    </div>`;
 
   return `
   <div id="pick-form">
-    <div class="section-label">Regular Pick</div>
-    <div class="text-xs text-muted mb-8">Who will score the first goal?</div>
-    <div class="player-search-wrap form-group">
-      <input class="form-input" id="regular-input" type="text" placeholder="Search player name..."
-        oninput="filterPlayers('regular-input','regular-dropdown','regular')" autocomplete="off">
-      <div class="player-dropdown hidden" id="regular-dropdown">
-        ${sortedPlayers.map(p => `
-        <div class="player-option" onclick="selectPlayer('regular','${esc(p)}')">
-          <span>${esc(p)}</span>
-          ${ineligible.includes(p) ? '' : ''}
-        </div>`).join('')}
-      </div>
-    </div>
 
-    <div class="section-label">Dark Side</div>
-    <div class="dh-toggle">
-      <div class="dh-toggle-opt active" id="dh-opt" onclick="setDarkSide('darkhorse')">🎯 Darkhorse Pick <span style="font-size:0.7rem;opacity:0.7">3 pts</span></div>
-      <div class="dh-toggle-opt" id="so-opt" onclick="setDarkSide('shutout')">🥅 Shutout Call <span style="font-size:0.7rem;opacity:0.7">5 pts</span></div>
-    </div>
-    <div id="darkhorse-section" class="form-group">
-      <div class="text-xs text-muted mb-8">Pick a darkhorse scorer — different from your regular pick.</div>
-      <div class="player-search-wrap">
-        <input class="form-input" id="darkhorse-input" type="text" placeholder="Search darkhorse..."
-          oninput="filterPlayers('darkhorse-input','darkhorse-dropdown','darkhorse')" autocomplete="off">
-        <div class="player-dropdown hidden" id="darkhorse-dropdown">
-          ${sortedPlayers.map(p => {
-            const isInelig = ineligible.includes(p);
-            return `<div class="player-option ${isInelig?'inelig-player':''}" onclick="${isInelig ? '' : `selectPlayer('darkhorse','${esc(p)}')`}" style="${isInelig ? 'opacity:0.4;cursor:not-allowed' : ''}">
-              <span>${esc(p)}</span>
-              ${isInelig ? '<span class="inelig-badge">Ineligible</span>' : ''}
-            </div>`;
-          }).join('')}
+    <div class="card mb-16" style="border-color:var(--tp,var(--bdr2))">
+      <div class="section-label" style="margin-top:0;margin-bottom:8px">🏒 GS — Goal Scorer <span style="font-size:0.72rem;font-weight:400;opacity:0.6">(1 pt)</span></div>
+      <div class="text-xs text-muted mb-8">Who do you think scores first?</div>
+      <div class="player-search-wrap form-group">
+        <input class="form-input" id="regular-input" type="text" placeholder="Tap to browse or search by name…"
+          oninput="filterPlayers('regular-input','regular-dropdown','regular')"
+          onfocus="filterPlayers('regular-input','regular-dropdown','regular')" autocomplete="off">
+        <div class="player-dropdown hidden" id="regular-dropdown">
+          ${sortedPlayers.map(p => `
+          <div class="player-option" onclick="selectPlayer('regular','${esc(p)}')">
+            <span>${esc(p)}</span>
+          </div>`).join('')}
         </div>
       </div>
-      <div id="inelig-warning" class="form-error" style="display:none">⚠️ That player is darkhorse-ineligible</div>
-    </div>
-    <div id="shutout-section" class="hidden card" style="background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.25);padding:16px;margin-bottom:16px">
-      <div class="flex items-center gap-12">
-        <span style="font-size:2rem">🥅</span>
-        <div>
-          <div class="text-md">Calling Shutout</div>
-          <div class="text-xs text-muted">No player scores. Worth 5 pts if correct.</div>
-        </div>
-      </div>
+      <div class="text-xs text-muted mb-4">Play type:</div>
+      ${ptBtns('play-type-group', 'setPlayType')}
     </div>
 
-    <div class="section-label">Play Type</div>
-    <div class="text-xs text-muted mb-8">What situation will the first goal be scored in?</div>
-    <div class="toggle-group mb-16" id="play-type-group">
-      <button class="toggle-item active" onclick="setPlayType('es',this)">Even Str.</button>
-      <button class="toggle-item" onclick="setPlayType('pp',this)">Power Play</button>
-      <button class="toggle-item" onclick="setPlayType('pk',this)" title="Penalty Kill = Shorthanded Goal (+3 pts)">Pen. Kill 🌟</button>
+    <div class="card mb-16" style="border-color:rgba(139,92,246,0.35)">
+      <div class="section-label" style="margin-top:0;margin-bottom:8px">🎯 DH — Darkhorse <span style="font-size:0.72rem;font-weight:400;opacity:0.6">(3 pts · or call Shutout for 5 pts)</span></div>
+      <div class="dh-toggle" style="margin-bottom:14px">
+        <div class="dh-toggle-opt active" id="dh-opt" onclick="setDarkSide('darkhorse')">🎯 Darkhorse Pick</div>
+        <div class="dh-toggle-opt" id="so-opt" onclick="setDarkSide('shutout')">🥅 Shutout Call</div>
+      </div>
+      <div id="darkhorse-section">
+        <div class="text-xs text-muted mb-8">Surprise scorer — must be different from GS.</div>
+        <div class="player-search-wrap form-group">
+          <input class="form-input" id="darkhorse-input" type="text" placeholder="Tap to browse or search by name…"
+            oninput="filterPlayers('darkhorse-input','darkhorse-dropdown','darkhorse')"
+            onfocus="filterPlayers('darkhorse-input','darkhorse-dropdown','darkhorse')" autocomplete="off">
+          <div class="player-dropdown hidden" id="darkhorse-dropdown">
+            ${sortedPlayers.map(p => {
+              const isInelig = ineligible.includes(p);
+              return `<div class="player-option" onclick="${isInelig ? '' : `selectPlayer('darkhorse','${esc(p)}')`}" style="${isInelig ? 'opacity:0.4;cursor:not-allowed' : ''}">
+                <span>${esc(p)}</span>
+                ${isInelig ? '<span class="inelig-badge">Ineligible</span>' : ''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="text-xs text-muted mb-4">Play type:</div>
+        ${ptBtns('dh-play-type-group', 'setDhPlayType')}
+      </div>
+      <div id="shutout-section" class="hidden" style="padding:8px 0 4px">
+        <div class="flex items-center gap-12">
+          <span style="font-size:2rem">🥅</span>
+          <div>
+            <div class="text-md">Calling Shutout</div>
+            <div class="text-xs text-muted">No goals scored. Worth 5 pts if correct.</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="pick-validation" class="form-error mb-8"></div>
     <button class="btn btn-primary btn-block btn-lg" id="submit-pick-btn" onclick="submitPick()">
       Lock In My Pick
     </button>
-    <div class="text-xs text-dim text-center mt-8">Picks lock automatically at deadline · Max 8 pts per game</div>
+    <div class="text-xs text-dim text-center mt-8">Picks lock at deadline · Max 8 pts per game</div>
   </div>`;
 }
 
@@ -2015,9 +2055,9 @@ async function filterPlayers(inputId, dropdownId, slot) {
   dd.classList.remove('hidden');
   const leagueId = S.league?.id;
   const [players, ineligibleRaw] = await Promise.all([DB.getPlayers(leagueId), DB.getIneligible(leagueId)]);
-  const ineligible = ineligibleRaw.map(i => i.player);
+  const ineligible = ineligibleRaw.map(i => i.playerName);
 
-  const filtered = [...players].sort().filter(p => p.toLowerCase().includes(query));
+  const filtered = [...players].sort().filter(p => !query || p.toLowerCase().includes(query));
   dd.innerHTML = filtered.length === 0
     ? '<div class="player-option text-dim">No players found</div>'
     : filtered.map(p => {
@@ -2028,7 +2068,6 @@ async function filterPlayers(inputId, dropdownId, slot) {
           ${isInelig ? '<span class="inelig-badge">Ineligible</span>' : ''}
         </div>`;
       }).join('');
-  if (!query) dd.classList.add('hidden');
 }
 
 function selectPlayer(slot, name) {
@@ -2063,6 +2102,11 @@ function setPlayType(pt, btn) {
   document.querySelectorAll('#play-type-group .toggle-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
+function setDhPlayType(pt, btn) {
+  window._pickState.dhPlayType = pt;
+  document.querySelectorAll('#dh-play-type-group .toggle-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
 
 async function submitPick(existingId) {
   const ps = window._pickState;
@@ -2074,7 +2118,7 @@ async function submitPick(existingId) {
   if (!ps.isShutout && ps.regular === ps.darkhorse) { err.textContent = 'Regular and darkhorse picks must be different.'; return; }
 
   const ineligibleRaw = await DB.getIneligible(S.league?.id);
-  if (!ps.isShutout && ineligibleRaw.map(i=>i.player).includes(ps.darkhorse)) {
+  if (!ps.isShutout && ineligibleRaw.map(i=>i.playerName).includes(ps.darkhorse)) {
     err.textContent = 'That player is darkhorse-ineligible this season.'; return;
   }
   const game = await DB.getGame(ps.gameId);
@@ -2086,7 +2130,7 @@ async function submitPick(existingId) {
   const pickData = {
     userId: S.user.id, gameId: ps.gameId, leagueId: S.league?.id,
     regular: ps.regular, darkhorse: ps.isShutout ? null : ps.darkhorse,
-    isShutout: ps.isShutout, playType: ps.playType, scored: false,
+    isShutout: ps.isShutout, playType: ps.playType, dhPlayType: ps.isShutout ? 'es' : (ps.dhPlayType || 'es'), scored: false,
   };
   try {
     if (existingId) { await DB.updatePick(existingId, pickData); toast('Pick updated!', 'ok'); }
@@ -2098,24 +2142,51 @@ async function submitPick(existingId) {
   }
 }
 
-async function editPick(pickId, gameId) {
-  const pick = await DB.getPick(pickId);
-  if (!pick) return;
-  route('pick-entry', {gameId, editPick: pick});
-  setTimeout(() => {
-    window._pickState = {gameId, regular: pick.regular, darkhorse: pick.darkhorse||'', isShutout: pick.isShutout, playType: pick.playType};
-    const ri = document.getElementById('regular-input');
-    const di = document.getElementById('darkhorse-input');
-    if (ri) ri.value = pick.regular;
-    if (!pick.isShutout && di) di.value = pick.darkhorse||'';
-    if (pick.isShutout) setDarkSide('shutout');
-    const ptBtns = document.querySelectorAll('#play-type-group .toggle-item');
-    ptBtns.forEach(b => b.classList.remove('active'));
-    const ptMap = {es:0, pp:1, pk:2};
-    if (ptBtns[ptMap[pick.playType]]) ptBtns[ptMap[pick.playType]].classList.add('active');
-    const sbtn = document.getElementById('submit-pick-btn');
-    if (sbtn) { sbtn.textContent = 'Update Pick'; sbtn.onclick = () => submitPick(pickId); }
-  }, 50);
+function startEditPick(gameId) {
+  S.params = {gameId, editing: true};
+  render().catch(err => { console.error(err); toast('Something went wrong.', 'err'); });
+}
+
+async function confirmDeletePick(pickId, gameId) {
+  openModal(`
+    <div class="text-center">
+      <div style="font-size:2.5rem;margin-bottom:12px">🗑</div>
+      <div class="text-md mb-8">Delete your pick?</div>
+      <div class="text-xs text-muted mb-20">You can submit a new pick before the deadline.</div>
+      <div class="flex gap-8 justify-center">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" style="background:var(--err);border-color:var(--err)" onclick="doDeletePick('${pickId}','${gameId}')">Delete</button>
+      </div>
+    </div>`, 'Delete Pick');
+}
+
+async function doDeletePick(pickId, gameId) {
+  closeModal();
+  await DB.deletePick(pickId);
+  toast('Pick deleted.', 'ok');
+  route('pick-entry', {gameId});
+}
+
+function prefillPickForm(pick) {
+  window._pickState = {
+    gameId: pick.gameId, regular: pick.regular,
+    darkhorse: pick.darkhorse||'', isShutout: pick.isShutout,
+    playType: pick.playType, dhPlayType: pick.dhPlayType||'es',
+  };
+  const ri = document.getElementById('regular-input');
+  const di = document.getElementById('darkhorse-input');
+  if (ri) ri.value = pick.regular;
+  if (!pick.isShutout && di) di.value = pick.darkhorse||'';
+  if (pick.isShutout) setDarkSide('shutout');
+  const ptMap = {es:0, pp:1, pk:2};
+  const ptBtns = document.querySelectorAll('#play-type-group .toggle-item');
+  ptBtns.forEach(b => b.classList.remove('active'));
+  if (ptBtns[ptMap[pick.playType]]) ptBtns[ptMap[pick.playType]].classList.add('active');
+  const dhBtns = document.querySelectorAll('#dh-play-type-group .toggle-item');
+  dhBtns.forEach(b => b.classList.remove('active'));
+  if (dhBtns[ptMap[pick.dhPlayType||'es']]) dhBtns[ptMap[pick.dhPlayType||'es']].classList.add('active');
+  const sbtn = document.getElementById('submit-pick-btn');
+  if (sbtn) { sbtn.textContent = 'Update Pick'; sbtn.onclick = () => submitPick(pick.id); }
 }
 
 // ==================== VIEW: PICKS LIST ======================
@@ -3312,18 +3383,48 @@ async function subscribeLeague(leagueId) {
 
 // ==================== INIT ==================================
 function init() {
+  let authHandled = false;
+
+  async function handleSession(event, session) {
+    authHandled = true;
+    try {
+      if (session) {
+        if (!S.authUser) await afterLogin(session.user);
+      } else {
+        S.user = null; S.authUser = null; S.league = null;
+        S.userLeagues = []; S.isAdmin = false; S.unread = 0;
+        for (const ch of S.channels) await sb.removeChannel(ch);
+        S.channels = [];
+        S.timers.forEach(clearTimeout); S.timers = [];
+        route('auth');
+      }
+    } catch(err) {
+      document.getElementById('app').innerHTML =
+        `<div style="color:#f87171;padding:24px;font-family:monospace"><b>Init error:</b> ${err.message}<br><pre style="white-space:pre-wrap;margin-top:8px">${err.stack||''}</pre></div>`;
+    }
+  }
+
   sb.auth.onAuthStateChange(async (event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-      if (!S.authUser) await afterLogin(session.user);
-    } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
-      S.user = null; S.authUser = null; S.league = null;
-      S.userLeagues = []; S.isAdmin = false; S.unread = 0;
-      for (const ch of S.channels) await sb.removeChannel(ch);
-      S.channels = [];
-      S.timers.forEach(clearTimeout); S.timers = [];
-      route('auth');
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      await handleSession(event, session);
+    } else if (event === 'SIGNED_OUT') {
+      await handleSession(event, null);
     }
   });
+
+  // Fallback: onAuthStateChange can be slow — use getSession() directly after 2s
+  setTimeout(async () => {
+    if (authHandled) return;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!authHandled) await handleSession('fallback', session);
+    } catch(err) {
+      if (!authHandled) {
+        document.getElementById('app').innerHTML =
+          `<div style="color:#f87171;padding:24px;font-family:monospace"><b>Connection error:</b> ${err.message}</div>`;
+      }
+    }
+  }, 2000);
 }
 
 init();
