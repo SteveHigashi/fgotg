@@ -1240,6 +1240,7 @@ async function render() {
     case 'profile':        await renderProfile(); break;
     case 'notifications':  await renderNotifications(); break;
     case 'admin':          await renderAdmin(); break;
+    case 'superadmin':     await renderSuperAdmin(); break;
     default:               await renderDashboard();
   }
 }
@@ -1247,8 +1248,13 @@ async function render() {
 // ===================== NAV ==================================
 function renderNav(active) {
   const isAdmin = S.isAdmin;
+  const isSA = S.user?.isSuperAdmin;
   return `
   <nav class="bottom-nav">
+    ${isSA ? `<button class="nav-item ${active==='superadmin'?'active':''}" onclick="route('superadmin')" style="color:#f59e0b">
+      ${ico('shield')}
+      <span>Super</span>
+    </button>` : ''}
     <button class="nav-item ${active==='dashboard'?'active':''}" onclick="route('dashboard')">
       ${ico('home')}
       <span>Home</span>
@@ -1260,10 +1266,6 @@ function renderNav(active) {
     <button class="nav-item ${active==='standings'?'active':''}" onclick="route('standings')">
       ${ico('trophy')}
       <span>Standings</span>
-    </button>
-    <button class="nav-item ${active==='history'?'active':''}" onclick="route('history')">
-      ${ico('clock')}
-      <span>History</span>
     </button>
     ${isAdmin ? `<button class="nav-item ${active==='admin'?'active':''}" onclick="route('admin')">
       ${ico('shield')}
@@ -1288,6 +1290,7 @@ function renderSidebar() {
     {v:'notifications', label:'Notifications', icon:'bell'},
     {v:'profile', label:'Profile', icon:'user'},
     ...(isAdmin ? [{v:'admin', label:'Admin Panel', icon:'shield'}] : []),
+    ...(S.user?.isSuperAdmin ? [{v:'superadmin', label:'⚡ Super Admin', icon:'shield'}] : []),
   ];
   return `
     <div class="sidebar-logo">FGOTG</div>
@@ -1581,6 +1584,7 @@ async function afterLogin(authUser) {
   const saved = savedId ? S.userLeagues.find(l => l.id === savedId) : null;
   S.league = saved || S.userLeagues[0] || null;
   S.isAdmin = S.league?.myRole === 'admin' || false;
+  S.isSuperAdmin = S.user?.isSuperAdmin || false;
 
   const {count} = await sb.from('notifications')
     .select('id', {count: 'exact', head: true})
@@ -3499,6 +3503,110 @@ async function subscribeLeague(leagueId) {
     .subscribe();
 
   S.channels.push(ch);
+}
+
+// ==================== SUPER ADMIN ===========================
+async function renderSuperAdmin() {
+  if (!S.user?.isSuperAdmin) { route('dashboard'); return; }
+
+  const [allLeagues, allProfiles] = await Promise.all([
+    sb.from('leagues').select('*, league_members(role, profiles(id, username, email))').then(r => (r.data||[]).map(toCamel)),
+    sb.from('profiles').select('*').order('username').then(r => (r.data||[]).map(toCamel)),
+  ]);
+
+  document.getElementById('app').innerHTML = `
+  ${renderHeader('⚡ Super Admin', false, false)}
+  <div class="page page-enter" style="padding-top:12px">
+
+    <div class="section-label">All Leagues</div>
+    ${allLeagues.length === 0 ? '<div class="empty"><div class="empty-title">No leagues yet</div></div>' :
+      allLeagues.map(l => {
+        const admins = (l.leagueMembers||[]).filter(m => m.role === 'admin');
+        const members = (l.leagueMembers||[]);
+        return `<div class="card mb-12">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <div class="text-md">${esc(l.name)}</div>
+              <div class="text-xs text-muted">${members.length} member${members.length!==1?'s':''} · Team ${esc(l.teamId||'')}</div>
+            </div>
+          </div>
+          <div class="text-xs text-muted mb-4">Admins:</div>
+          ${admins.map(m => `
+          <div class="flex items-center justify-between py-4" style="border-top:1px solid var(--bdr)">
+            <span class="text-sm">${esc(m.profiles?.username||'?')} <span class="text-muted">${esc(m.profiles?.email||'')}</span></span>
+            <button class="btn btn-ghost btn-sm" style="font-size:0.75rem" onclick="saChangeLeagueAdmin('${l.id}')">Change Admin</button>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+
+    <div class="section-label mt-16">All Users</div>
+    <div class="card">
+      ${allProfiles.map(p => `
+      <div class="flex items-center justify-between py-8" style="border-bottom:1px solid var(--bdr)">
+        <div>
+          <div class="text-sm">${esc(p.username)} ${p.isSuperAdmin ? '<span class="pill pill-ok" style="font-size:0.65rem">SUPER ADMIN</span>' : ''}</div>
+          <div class="text-xs text-muted">${esc(p.email)}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="font-size:0.75rem"
+          onclick="saToggleSuperAdmin('${p.id}','${esc(p.username)}',${!!p.isSuperAdmin})">
+          ${p.isSuperAdmin ? 'Revoke SA' : 'Grant SA'}
+        </button>
+      </div>`).join('')}
+    </div>
+
+  </div>
+  ${renderNav('superadmin')}`;
+}
+
+async function saToggleSuperAdmin(userId, username, currently) {
+  const action = currently ? 'Revoke' : 'Grant';
+  openModal(`
+    <div class="text-center">
+      <div style="font-size:2.5rem;margin-bottom:12px">⚡</div>
+      <div class="text-md mb-8">${action} Super Admin for <b>${esc(username)}</b>?</div>
+      <div class="flex gap-8 justify-center mt-16">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saDoToggleSuperAdmin('${userId}',${currently})">${action}</button>
+      </div>
+    </div>`, `${action} Super Admin`);
+}
+
+async function saDoToggleSuperAdmin(userId, currently) {
+  closeModal();
+  const {error} = await sb.from('profiles').update({is_super_admin: !currently}).eq('id', userId);
+  if (error) { toast('Error updating role', 'err'); return; }
+  toast(currently ? 'Super admin revoked.' : 'Super admin granted!', 'ok');
+  route('superadmin');
+}
+
+async function saChangeLeagueAdmin(leagueId) {
+  const {data: members} = await sb.from('league_members')
+    .select('role, profiles(id, username, email)')
+    .eq('league_id', leagueId);
+  const list = (members||[]).map(m => ({...toCamel(m.profiles||{}), role: m.role}));
+  openModal(`
+    <div>
+      <div class="text-sm text-muted mb-12">Select new admin. Current admins are marked.</div>
+      ${list.map(u => `
+      <div class="flex items-center justify-between py-8" style="border-bottom:1px solid var(--bdr)">
+        <div>
+          <span class="text-sm">${esc(u.username)}</span>
+          ${u.role==='admin' ? ' <span class="pill pill-ok" style="font-size:0.65rem">admin</span>' : ''}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="saSetLeagueAdmin('${leagueId}','${u.id}','${esc(u.username)}')">
+          ${u.role==='admin' ? 'Remove Admin' : 'Make Admin'}
+        </button>
+      </div>`).join('')}
+    </div>`, 'Change League Admin');
+}
+
+async function saSetLeagueAdmin(leagueId, userId, username) {
+  const {data: cur} = await sb.from('league_members').select('role').eq('league_id', leagueId).eq('user_id', userId).single();
+  const newRole = cur?.role === 'admin' ? 'member' : 'admin';
+  await sb.from('league_members').update({role: newRole}).eq('league_id', leagueId).eq('user_id', userId);
+  closeModal();
+  toast(`${username} is now ${newRole}.`, 'ok');
+  route('superadmin');
 }
 
 // ==================== INIT ==================================

@@ -17,11 +17,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- User profiles (extends auth.users)
 CREATE TABLE public.profiles (
-  id         uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  username   text NOT NULL UNIQUE,
-  email      text NOT NULL UNIQUE,   -- duplicated from auth.users for username→email lookups
-  team_id    text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id              uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username        text NOT NULL UNIQUE,
+  email           text NOT NULL UNIQUE,   -- duplicated from auth.users for username→email lookups
+  team_id         text,
+  is_super_admin  boolean NOT NULL DEFAULT false,
+  created_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- Leagues
