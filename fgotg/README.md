@@ -2,135 +2,143 @@
 
 A hockey prediction league where you guess the first goal scorer of your favourite NHL team's games. Play head-to-head with friends over a full season, earn points for correct picks, and claim the throne.
 
+> **Built entirely through prompt engineering** — this app was designed, architected, and iterated using Claude Code (AI CLI). No boilerplate, no starter templates. Every feature was described in plain language and refined through conversation.
+
 ---
 
 ## How It Works
 
-Before each game's pick deadline, every player submits three things:
+Before each game's pick deadline, every player submits:
 
 | Pick | Description | Max Points |
 |---|---|---|
-| **Regular Pick** | The player you think scores the first goal | 1 pt |
-| **Darkhorse Pick** | A surprise scorer (higher reward, different from Regular) | 3 pts |
+| **GS — Goal Scorer** | Who you think scores first | 1 pt |
+| **DH — Darkhorse** | Surprise scorer (must differ from GS) | 3 pts |
 | **— or — Shutout Call** | Predict no goals scored | 5 pts |
-| **Play Type** | Even Strength · Power Play · Penalty Kill | +1 pt (PK = +3 pts) |
+| **Play Type (each pick)** | Even Strength · Power Play · Penalty Kill | +1 pt (PK = +3 pts) |
 
 **Maximum: 8 points per game.**
 
-### Scoring Breakdown
-
+### Scoring
 - Darkhorse scores first → **3 pts** + play type bonus
-  - If darkhorse scored first and your Regular scores *second* → **+1 pt** bonus + play type
-- Regular scores first → **1 pt** + play type bonus
-- Correct play type → **+1 pt** (Penalty Kill shorthanded goal → **+3 pts**)
-- Correct shutout call → **5 pts**
-- Wrong shutout call → **0 pts**
+  - If darkhorse scored first and GS scores *second* → **+1 pt** bonus
+- Goal Scorer scores first → **1 pt** + play type bonus
+- Correct play type → **+1 pt** (Penalty Kill → **+3 pts**)
+- Correct shutout call → **5 pts** · Wrong call → **0 pts**
 
-### Tiebreakers (in order)
+### Tiebreakers
 1. Most shutouts correctly called
 2. Most darkhorse picks correct
 3. Most games participated in
 
 ---
 
+## Build Process — Prompt Engineering Showcase
+
+This project was built through iterative AI-assisted development over multiple sessions. Here's what was tackled entirely through prompting:
+
+### Architecture decisions prompted
+- Single-file SPA (no build tools, no framework) — keeps deployment dead simple
+- Supabase (Postgres + Auth + Realtime) as backend — free tier, zero DevOps
+- Hash-based routing, global state object, localStorage-first then migrated to DB
+- Row Level Security policies written from plain-English descriptions of access rules
+
+### Features built through prompting
+- Full scoring engine (`Score.calc`) with tiebreaker logic
+- Real-time leaderboard with podium display
+- Per-player play type prediction (GS and DH each get their own ES/PP/PK)
+- Pick editing and deletion before game deadline
+- Forgot password flow with email reset link
+- Social login hooks (Google, Twitter/X, Facebook) — deferred but scaffolded
+- Admin panel: schedule import via NHL public API, result entry, roster management
+- Supabase Realtime subscriptions for live score/game updates
+- CORS proxy for local development
+
+### Debugging done through prompting
+- Diagnosed supabase-js v2 internal auth lock contention causing login hangs
+- Traced CORS preflight blocking in Chrome vs Safari
+- Fixed compressed response (gzip) passthrough in local proxy
+- Resolved RLS policy gaps and trigger failures via Supabase Management API
+
+### Schema designed through prompting
+10 tables, 6 stored functions, 34 RLS policies — all described in plain English and generated as production-ready SQL.
+
+---
+
 ## Tech Stack
 
-- **Frontend**: Single HTML file — no build tools, no framework, vanilla JS
+- **Frontend**: Single HTML file — vanilla JS, no framework, no build step
 - **Backend**: [Supabase](https://supabase.com) (Postgres + Auth + Realtime)
-- **Data**: NHL public schedule API (`api-web.nhle.com`) for automatic game import
-- **Hosting**: Any static host (Netlify, Vercel, GitHub Pages, etc.)
+- **Data**: NHL public API (`api-web.nhle.com`) for schedule import
+- **Hosting**: Any static host (Netlify, Vercel, GitHub Pages)
 
 ---
 
 ## Setup
 
 ### 1. Supabase project
-
 1. Create a free project at [supabase.com](https://supabase.com)
-2. Open **SQL Editor → New query** and run the contents of `schema.sql`
-3. In **Authentication → Settings**, optionally disable email confirmation for easier local testing
-4. In **Database → Replication**, confirm that `games`, `results`, `picks`, and `notifications` have Realtime enabled
+2. Run `schema.sql` in the SQL Editor
+3. Disable email confirmation in **Authentication → Settings** for easier testing
+4. Enable Realtime on `games`, `results`, `picks`, `notifications` tables
 
-### 2. Configure the app
-
-Open `index.html` and fill in your project credentials near the top of the `<script>` block:
-
+### 2. Configure credentials
+Edit `index.html` near the top of the `<script>` block:
 ```js
 const SUPABASE_URL      = 'https://xxxxxxxxxxxx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJ...your_anon_key...';
 ```
 
-Both values are found in **Project Settings → API**.
-
-### 3. Open the file
-
-Open `index.html` in any browser. No server required for local testing.
-
-For public access, deploy the single file to any static host:
-
+### 3. Run locally
 ```bash
-# Netlify (drag-and-drop deploy or CLI)
-netlify deploy --dir . --prod
+python3 /tmp/fgotg_server.py   # starts dev server + CORS proxy on :8080
+# then open http://localhost:8080 in Safari
+```
 
-# Vercel
-vercel --prod
-
-# GitHub Pages — push to a repo and enable Pages on the main branch
+### 4. Deploy
+```bash
+netlify deploy --dir . --prod   # or Vercel, or GitHub Pages
 ```
 
 ---
 
 ## Features
 
-### Player side
-- Sign up with username + email
-- Choose your NHL team and join or create a league
-- Submit picks per game before the deadline
+### Player
+- Sign up, choose NHL team, join or create a league
+- Submit GS + DH picks (each with ES/PP/PK) or call a shutout
+- Edit or delete picks before the deadline
 - Live countdown to pick deadline
-- View your score breakdown after results are posted
-- Season standings with podium, tiebreaker sorting
-- Full game history
-- In-app notifications (new games, results posted)
+- Score breakdown after results posted
+- Season standings with podium + tiebreaker sort
+- Full game history and in-app notifications
 
-### Admin side
-- Import the full NHL schedule with one click (via NHL public API)
-- Add / edit / delete games manually
-- Enter game results (first scorer, play type, optional second scorer)
-- Picks are automatically scored when results are saved
-- Manage team roster (add/remove players)
-- Mark players as darkhorse-ineligible
+### Admin
+- One-click NHL schedule import
+- Manual game add/edit/delete
+- Enter results → picks auto-scored via server-side RPC
+- Roster management (add/remove players, mark DH-ineligible)
 - Season management (start, archive, rename)
-- Promote / remove league admins
+- Promote/remove league admins
 
 ---
 
-## Game Rules Summary
-
-- Picks lock automatically at each game's deadline
-- Darkhorse and Regular picks must be **different** players
-- Players marked **DH Ineligible** cannot be selected as a Darkhorse pick
-- If a shutout is called and the game has goals → **0 pts**
-- If goals are scored and a shutout was predicted → **0 pts**
-- Points are capped at **8 per game**
-
----
-
-## Schema Overview
+## Schema
 
 ```
-profiles          — user display name, team, email
-leagues           — league name + team affiliation
-league_members    — membership + role (admin / member)
-seasons           — named seasons per league
-games             — scheduled games with puck drop + deadline
-picks             — user submissions per game
-results           — first/second goal scorer + play type
-league_players    — roster of eligible scorers
-ineligible_players — darkhorse-restricted players
-notifications     — in-app messages broadcast to league members
+profiles           — username, team, email
+leagues            — league name + team
+league_members     — role (admin / member)
+seasons            — named seasons per league
+games              — puck drop + deadline
+picks              — GS + DH + play types + shutout flag
+results            — first/second scorer + play type
+league_players     — eligible roster
+ineligible_players — DH-restricted players
+notifications      — broadcast messages
 ```
 
-Row Level Security ensures users can only read/write their own data. Admin operations are guarded by `is_league_admin()` helper functions.
+RLS ensures users only access their own data. Admin actions guarded by `is_league_admin()` server-side helper.
 
 ---
 
