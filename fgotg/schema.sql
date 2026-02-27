@@ -190,6 +190,24 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(
+    (SELECT is_super_admin FROM profiles WHERE id = auth.uid()),
+    false
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.toggle_super_admin(target_user_id uuid, new_value boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'Forbidden: super admin access required';
+  END IF;
+  UPDATE profiles SET is_super_admin = new_value WHERE id = target_user_id;
+END;
+$$;
+
 -- ============================================================
 -- 4. RLS POLICIES
 -- ============================================================
@@ -224,47 +242,47 @@ CREATE POLICY "leagues_insert" ON public.leagues
   FOR INSERT TO authenticated WITH CHECK (true);
 
 CREATE POLICY "leagues_update" ON public.leagues
-  FOR UPDATE TO authenticated USING (is_league_admin(id));
+  FOR UPDATE TO authenticated USING (is_league_admin(id) OR is_super_admin());
 
 -- league_members
 CREATE POLICY "lm_select" ON public.league_members
-  FOR SELECT TO authenticated USING (is_league_member(league_id));
+  FOR SELECT TO authenticated USING (is_league_member(league_id) OR is_super_admin());
 
 CREATE POLICY "lm_insert" ON public.league_members
   FOR INSERT TO authenticated WITH CHECK (
-    is_league_admin(league_id) OR user_id = auth.uid()
+    is_league_admin(league_id) OR user_id = auth.uid() OR is_super_admin()
   );
 
 CREATE POLICY "lm_update" ON public.league_members
-  FOR UPDATE TO authenticated USING (is_league_admin(league_id));
+  FOR UPDATE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "lm_delete" ON public.league_members
   FOR DELETE TO authenticated USING (
-    is_league_admin(league_id) OR user_id = auth.uid()
+    is_league_admin(league_id) OR user_id = auth.uid() OR is_super_admin()
   );
 
 -- seasons
 CREATE POLICY "seasons_select" ON public.seasons
-  FOR SELECT TO authenticated USING (is_league_member(league_id));
+  FOR SELECT TO authenticated USING (is_league_member(league_id) OR is_super_admin());
 
 CREATE POLICY "seasons_insert" ON public.seasons
-  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id));
+  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "seasons_update" ON public.seasons
-  FOR UPDATE TO authenticated USING (is_league_admin(league_id));
+  FOR UPDATE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 -- games
 CREATE POLICY "games_select" ON public.games
-  FOR SELECT TO authenticated USING (is_league_member(league_id));
+  FOR SELECT TO authenticated USING (is_league_member(league_id) OR is_super_admin());
 
 CREATE POLICY "games_insert" ON public.games
-  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id));
+  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "games_update" ON public.games
-  FOR UPDATE TO authenticated USING (is_league_admin(league_id));
+  FOR UPDATE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "games_delete" ON public.games
-  FOR DELETE TO authenticated USING (is_league_admin(league_id));
+  FOR DELETE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 -- picks: users write own picks; league admins can update for scoring
 CREATE POLICY "picks_select" ON public.picks
@@ -289,38 +307,38 @@ CREATE POLICY "picks_update" ON public.picks
 -- results
 CREATE POLICY "results_select" ON public.results
   FOR SELECT TO authenticated USING (
-    is_league_member((SELECT league_id FROM public.games WHERE id = game_id))
+    is_league_member((SELECT league_id FROM public.games WHERE id = game_id)) OR is_super_admin()
   );
 
 CREATE POLICY "results_insert" ON public.results
   FOR INSERT TO authenticated WITH CHECK (
-    is_league_admin((SELECT league_id FROM public.games WHERE id = game_id))
+    is_league_admin((SELECT league_id FROM public.games WHERE id = game_id)) OR is_super_admin()
   );
 
 CREATE POLICY "results_update" ON public.results
   FOR UPDATE TO authenticated USING (
-    is_league_admin((SELECT league_id FROM public.games WHERE id = game_id))
+    is_league_admin((SELECT league_id FROM public.games WHERE id = game_id)) OR is_super_admin()
   );
 
 -- league_players
 CREATE POLICY "lp_select" ON public.league_players
-  FOR SELECT TO authenticated USING (is_league_member(league_id));
+  FOR SELECT TO authenticated USING (is_league_member(league_id) OR is_super_admin());
 
 CREATE POLICY "lp_insert" ON public.league_players
-  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id));
+  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "lp_delete" ON public.league_players
-  FOR DELETE TO authenticated USING (is_league_admin(league_id));
+  FOR DELETE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 -- ineligible_players
 CREATE POLICY "ip_select" ON public.ineligible_players
-  FOR SELECT TO authenticated USING (is_league_member(league_id));
+  FOR SELECT TO authenticated USING (is_league_member(league_id) OR is_super_admin());
 
 CREATE POLICY "ip_insert" ON public.ineligible_players
-  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id));
+  FOR INSERT TO authenticated WITH CHECK (is_league_admin(league_id) OR is_super_admin());
 
 CREATE POLICY "ip_delete" ON public.ineligible_players
-  FOR DELETE TO authenticated USING (is_league_admin(league_id));
+  FOR DELETE TO authenticated USING (is_league_admin(league_id) OR is_super_admin());
 
 -- notifications
 CREATE POLICY "notifs_select" ON public.notifications
@@ -346,8 +364,8 @@ CREATE OR REPLACE FUNCTION public.broadcast_notif(
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  IF NOT is_league_admin(p_league_id) THEN
-    RAISE EXCEPTION 'Not authorized: must be league admin';
+  IF NOT is_league_admin(p_league_id) AND NOT is_super_admin() THEN
+    RAISE EXCEPTION 'Not authorized: must be league admin or super admin';
   END IF;
   INSERT INTO notifications (user_id, league_id, message, type)
   SELECT user_id, p_league_id, p_message, p_type
@@ -362,8 +380,8 @@ CREATE OR REPLACE FUNCTION public.set_league_players(
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  IF NOT is_league_admin(p_league_id) THEN
-    RAISE EXCEPTION 'Not authorized: must be league admin';
+  IF NOT is_league_admin(p_league_id) AND NOT is_super_admin() THEN
+    RAISE EXCEPTION 'Not authorized: must be league admin or super admin';
   END IF;
   DELETE FROM league_players WHERE league_id = p_league_id;
   IF array_length(p_players, 1) IS NOT NULL THEN
@@ -374,7 +392,7 @@ END;
 $$;
 
 -- Score all picks for a game after result is entered
--- Admin-only; updates pts/breakdown/scored on each pick
+-- Admin/SA only; updates pts/breakdown/scored on each pick
 CREATE OR REPLACE FUNCTION public.score_game(p_game_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -387,10 +405,10 @@ DECLARE
   v_reg_scored boolean;
   v_pt_pts     smallint;
 BEGIN
-  -- Check caller is admin
+  -- Check caller is admin or super admin
   SELECT league_id INTO v_league_id FROM games WHERE id = p_game_id;
-  IF NOT is_league_admin(v_league_id) THEN
-    RAISE EXCEPTION 'Not authorized: must be league admin';
+  IF NOT is_league_admin(v_league_id) AND NOT is_super_admin() THEN
+    RAISE EXCEPTION 'Not authorized: must be league admin or super admin';
   END IF;
 
   -- Get result
