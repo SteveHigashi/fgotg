@@ -970,18 +970,40 @@ const Auth = {
   async login(emailOrUser, password) {
     let email = emailOrUser.trim();
     if (!email.includes('@')) {
-      const {data} = await sb.from('profiles').select('email').eq('username', email).single();
-      if (!data?.email) return {err: 'User not found. Try logging in with your email address.'};
-      email = data.email;
+      // Username → email lookup via direct fetch (avoids supabase-js lock)
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const r = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?select=email&username=eq.${encodeURIComponent(email)}&limit=1`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, signal: ctrl.signal }
+        );
+        clearTimeout(t);
+        const d = await r.json();
+        if (!d[0]?.email) return {err: 'User not found. Try signing in with your email address.'};
+        email = d[0].email;
+      } catch(e) { clearTimeout(t); return {err: 'Connection error looking up username.'}; }
     }
+    // Use raw fetch for the auth call — avoids supabase-js internal lock contention
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
     try {
-      const result = await Promise.race([
-        sb.auth.signInWithPassword({email, password}),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('Login timed out — check your internet connection and try again.')), 12000)),
-      ]);
-      if (result.error) return {err: result.error.message};
-      return {user: result.data.user};
-    } catch(err) { return {err: err.message}; }
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({email, password}),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      const data = await res.json();
+      if (!res.ok) return {err: data.msg || data.error_description || data.error || 'Invalid credentials'};
+      // Set the session in supabase-js so it fires SIGNED_IN
+      await sb.auth.setSession({access_token: data.access_token, refresh_token: data.refresh_token});
+      return {user: data.user};
+    } catch(e) {
+      clearTimeout(t);
+      return {err: e.name === 'AbortError' ? 'Connection timed out — try refreshing the page.' : e.message};
+    }
   },
   async resetPassword(email) {
     const {error} = await sb.auth.resetPasswordForEmail(email.trim(), {
@@ -3467,26 +3489,18 @@ async function subscribeLeague(leagueId) {
 
 // ==================== INIT ==================================
 function init() {
-  // Show login immediately — don't wait for Supabase
   route('auth');
 
-  // Then check if there's an existing session in the background
-  sb.auth.getSession().then(({ data: { session } }) => {
-    if (session && !S.authUser) afterLogin(session.user).catch(console.error);
-  }).catch(err => console.error('getSession:', err));
-
-  // Listen for future sign-in / sign-out events
   sb.auth.onAuthStateChange(async (event, session) => {
     try {
       if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the reset link in their email — show the new-password form
         route('auth');
         setTimeout(() => authShowTab('reset'), 50);
         return;
       }
-      if (event === 'SIGNED_IN' && session && !S.authUser) {
+      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !S.authUser) {
         await afterLogin(session.user);
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
         S.user = null; S.authUser = null; S.league = null;
         S.userLeagues = []; S.isAdmin = false; S.unread = 0;
         for (const ch of S.channels) await sb.removeChannel(ch);
